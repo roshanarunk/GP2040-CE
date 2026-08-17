@@ -106,7 +106,15 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 			setStatus(data);
 			// The firmware advances from the idle phase on its own once the sampling
 			// window elapses, so follow its reported mode rather than a local timer.
-			if (data.mode === 'press' && step === STEP_BASELINE) setStep(STEP_PRESS);
+			//
+			// This deliberately does not read `step`: poll() is handed to setInterval
+			// once, so it closes over the values from that render forever, and a
+			// `step === STEP_BASELINE` guard here would compare against the stale
+			// initial value and never match. Deriving the step from the reported mode
+			// inside the updater keeps it correct regardless of when poll() was made.
+			if (data.mode === 'press') {
+				setStep((current) => (current === STEP_BASELINE ? STEP_PRESS : current));
+			}
 		} catch (e) {
 			setError(String(e));
 			stopPolling();

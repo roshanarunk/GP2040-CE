@@ -498,7 +498,15 @@ uint32_t HETriggerAddon::getCalibrationElapsedMs() {
 
 void HETriggerAddon::accumulateCalibration(uint8_t he, uint16_t raw) {
     HECalChannel & channel = calData[he];
-    channel.lastRaw = raw;
+
+    // Smooth the *displayed* value only. The statistics below deliberately use the
+    // raw reading: the variance needs independent samples to be meaningful, and
+    // filtering would attenuate exactly the brief peak the press phase looks for.
+    // A jittering number in the UI helps nobody, though, so the tile gets a
+    // lightly filtered version instead.
+    channel.lastRaw = (channel.lastRaw == 0)
+                          ? raw
+                          : (uint16_t)(((uint32_t)channel.lastRaw * 3 + raw) / 4);
 
     if (calMode == HECalMode::IDLE_BASELINE) {
         channel.sampleCount++;

@@ -9,6 +9,8 @@ import invert from 'lodash/invert';
 import omit from 'lodash/omit';
 
 import HECalibration from '../Components/HECalibration';
+import HECalibrationWizard from '../Components/HECalibrationWizard';
+import HEProfileSelector from '../Components/HEProfileSelector';
 
 import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
 
@@ -37,7 +39,31 @@ const SELECTABLE_BUTTON_ACTIONS = [
 	63, 64, 65, 66, 72, 73, 74, 75, 76, 77, 78
 ];
 
+// HE-local pseudo-actions for switching binding profiles. These live above
+// GpioAction's range so they can share the action field, and they are offered
+// here ONLY -- they must never appear in the GPIO pin mapping UI, where they
+// would be meaningless. Must match the HE_ACTION_PROFILE_* defines in
+// headers/addons/he_trigger.h.
+export const HE_ACTION_PROFILE_CYCLE = 1000;
+export const HE_ACTION_PROFILE_1 = 1001;
+
+const HE_PROFILE_ACTIONS = [
+	HE_ACTION_PROFILE_CYCLE,
+	HE_ACTION_PROFILE_1,
+	HE_ACTION_PROFILE_1 + 1,
+	HE_ACTION_PROFILE_1 + 2,
+	HE_ACTION_PROFILE_1 + 3,
+];
+
+const heProfileActionLabel = (actionId: number) => {
+	if (actionId === HE_ACTION_PROFILE_CYCLE) return 'HE_PROFILE_CYCLE';
+	return `HE_PROFILE_${actionId - HE_ACTION_PROFILE_1 + 1}`;
+};
+
 const getOption = (e, actionId) => {
+	if (HE_PROFILE_ACTIONS.includes(actionId)) {
+		return { label: heProfileActionLabel(actionId), value: actionId };
+	}
 	return {
 		label: invert(BUTTON_ACTIONS)[actionId],
 		value: actionId,
@@ -110,12 +136,19 @@ export const HETriggerState = {
 	heTriggerSmoothingFactor: 5,
 };
 
-const options = Object.entries(BUTTON_ACTIONS)
-	.filter(([, value]) => isSelectable(value))
-	.map(([key, value]) => ({
-		label: key,
-		value,
-	}));
+const options = [
+	...Object.entries(BUTTON_ACTIONS)
+		.filter(([, value]) => isSelectable(value))
+		.map(([key, value]) => ({
+			label: key,
+			value,
+		})),
+	// Profile switching is offered on hall effect channels only.
+	...HE_PROFILE_ACTIONS.map((value) => ({
+		label: heProfileActionLabel(value),
+		value: value as PinActionValues,
+	})),
+];
 
 type TriggerActionsFormTypes = {
 	triggers: Trigger[];
@@ -144,6 +177,7 @@ const TriggerActionsForm = ({
 	const { buttonLabels } = useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
 	const [showModal, setShowModal] = useState(false);
+	const [showWizard, setShowWizard] = useState(false);
 	const [calibrationTarget, setCalibrationTarget] = useState(0);
 	const [calibrateAllLoop, setCalibrateAllLoop] = useState(false);
 	const { buttonLabelType, swapTpShareLabels } = buttonLabels;
@@ -151,6 +185,21 @@ const TriggerActionsForm = ({
 	const CURRENT_BUTTONS = getButtonLabels(buttonLabelType, swapTpShareLabels);
 	const buttonNames = omit(CURRENT_BUTTONS, ['label', 'value']);
 	const { t } = useTranslation('');
+
+	// Shared by the base grid and the per-profile grids. The HE profile
+	// pseudo-actions have no PinMapping translation key, so they are resolved
+	// against the HETrigger namespace instead.
+	const optionLabel = (option: { label: string; value: number }) => {
+		if (HE_PROFILE_ACTIONS.includes(option.value)) {
+			return t(`HETrigger:action-${option.label.toLowerCase()}`);
+		}
+		const labelKey = option.label.split('BUTTON_PRESS_').pop();
+		// Need to fallback as some button actions are not part of button names
+		return (
+			(labelKey && buttonNames[labelKey]) ||
+			t(`PinMapping:actions.${option.label}`)
+		);
+	};
 
 	const handleSave = async (e) => {
 		e.preventDefault();
@@ -169,9 +218,19 @@ const TriggerActionsForm = ({
 				<div className="mt-2">
 					<h1>{t('HETrigger:action-assignment-sub-header')}</h1>
 				</div>
-				<div className="mt-2">
+				<div className="mt-2 d-flex gap-2 flex-wrap">
+					{/* Guided flow: calibrates every assigned button in one pass. */}
+					<Button type="button"
+						key={`calibrate-wizard-he`}
+						onClick={() => setShowWizard(true)}
+						disabled={triggers.filter((e)=>{ return e.action !== -10; }).length === 0}
+						className="my-2">
+						{t('HETrigger:wizard-button')}
+					</Button>
+					{/* Per-channel flow, kept for hand tuning a single switch. */}
 					<Button type="button"
 						key={`calibrate-all-he`}
+						variant="secondary"
 						onClick={(e) => {
 							setShowModal(true);
 							setCalibrationTarget(0);
@@ -210,14 +269,7 @@ const TriggerActionsForm = ({
 										isSearchable
 										options={options}
 										value={getOption(triggers[key], triggers[key].action)}
-										getOptionLabel={(option) => {
-											const labelKey = option.label.split('BUTTON_PRESS_').pop();
-											// Need to fallback as some button actions are not part of button names
-											return (
-												(labelKey && buttonNames[labelKey]) ||
-												t(`PinMapping:actions.${option.label}`)
-											);
-										}}
+										getOptionLabel={optionLabel}
 										onChange={(change) =>
 											setHETrigger(
 												{
@@ -253,6 +305,17 @@ const TriggerActionsForm = ({
 					calibrateAllLoop={calibrateAllLoop}
 					muxChannels={muxChannels}
 				></HECalibration>
+				<HECalibrationWizard
+					values={values}
+					showModal={showWizard}
+					setShowModal={setShowWizard}
+				></HECalibrationWizard>
+				<HEProfileSelector
+					options={options}
+					muxChannels={muxChannels}
+					usableChannels={Math.min(4, Math.floor(32 / muxChannels)) * muxChannels}
+					getOptionLabel={optionLabel}
+				></HEProfileSelector>
 			</div>
 			<div className="mt-2">
 				<Button type="button" onClick={() => {setShowVoltTable(!showVoltTable)}} className="my-4">

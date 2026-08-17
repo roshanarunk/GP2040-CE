@@ -674,9 +674,45 @@ async function getHETriggerCalibrations() {
 
 // POST to set all Hall Effect Trigger Calibrations
 async function setHETriggerCalibrations(triggers) {
-	console.dir(triggers);
-
 	return Http.post(`${baseUrl}/api/setHETriggerCalibrations`, triggers);
+}
+
+// --- guided calibration ---
+// The firmware runs the sweep; these only drive it and read progress.
+async function startHECalibration() {
+	const response = await Http.post(`${baseUrl}/api/startHECalibration`, {});
+	return response.data;
+}
+
+async function advanceHECalibration(phase) {
+	const response = await Http.post(`${baseUrl}/api/advanceHECalibration`, {
+		phase,
+	});
+	return response.data;
+}
+
+async function getHECalibrationStatus() {
+	const response = await Http.post(`${baseUrl}/api/getHECalibrationStatus`, {});
+	return response.data;
+}
+
+async function applyHECalibration(preset) {
+	const response = await Http.post(`${baseUrl}/api/applyHECalibration`, preset);
+	return response.data;
+}
+
+// --- hall effect binding profiles (bindings only; tuning is shared) ---
+async function getHETriggerProfiles() {
+	try {
+		const response = await Http.get(`${baseUrl}/api/getHETriggerProfiles`);
+		return response.data;
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+async function setHETriggerProfiles(profiles) {
+	return Http.post(`${baseUrl}/api/setHETriggerProfiles`, profiles);
 }
 
 async function getHeldPins(abortSignal) {
@@ -744,6 +780,12 @@ export default {
 	setHETriggerCalibrations,
 	getHETriggerCalibrations,
 	setHETriggerOptions,
+	startHECalibration,
+	advanceHECalibration,
+	getHECalibrationStatus,
+	applyHECalibration,
+	getHETriggerProfiles,
+	setHETriggerProfiles,
 	getReactiveLEDs,
 	setReactiveLEDs,
 	getButtonLayouts,

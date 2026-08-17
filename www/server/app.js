@@ -927,6 +927,90 @@ app.post('/api/getHETriggerVoltage', (req, res) => {
 	});
 });
 
+// --- guided calibration mock ---
+// Scripts a plausible session so the wizard can be exercised in a browser with no
+// hardware: two seconds of idle, then channels report "moved" one at a time.
+let heCalState = { mode: 'off', startedAt: 0, phaseStartedAt: 0 };
+const HE_MOCK_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 7];
+const HE_MOCK_IDLE_MS = 2000;
+
+app.post('/api/startHECalibration', (req, res) => {
+	const now = Date.now();
+	heCalState = { mode: 'idle', startedAt: now, phaseStartedAt: now };
+	return res.send({ mode: 'idle' });
+});
+
+app.post('/api/advanceHECalibration', (req, res) => {
+	const phase = req.body?.phase;
+	if (phase === 'press') heCalState.mode = 'press';
+	else if (phase === 'finish') heCalState.mode = 'done';
+	else if (phase === 'abort') heCalState.mode = 'off';
+	heCalState.phaseStartedAt = Date.now();
+	return res.send({ mode: heCalState.mode });
+});
+
+app.post('/api/getHECalibrationStatus', (req, res) => {
+	const now = Date.now();
+	let elapsed = now - heCalState.phaseStartedAt;
+
+	// Mirror the firmware, which advances out of the idle phase on its own.
+	if (heCalState.mode === 'idle' && elapsed >= HE_MOCK_IDLE_MS) {
+		heCalState.mode = 'press';
+		heCalState.phaseStartedAt = now;
+		elapsed = 0;
+	}
+
+	const pressElapsed = heCalState.mode === 'press' ? elapsed : 0;
+	const channels = HE_MOCK_CHANNELS.map((id) => {
+		// One channel "captured" every 1.5s, so the tiles fill in progressively.
+		const moved = heCalState.mode === 'press' && pressElapsed > (id + 1) * 1500;
+		return {
+			id,
+			raw: moved ? 3400 + (id % 5) : 1840 + (id % 7),
+			idle: 1840 + (id % 7),
+			stdDev: id === 3 ? 140 : 6, // channel 3 exercises the unstable warning
+			maxDeviation: moved ? 1600 + id * 20 : (id % 3) - 1,
+			moved,
+			unstable: id === 3,
+		};
+	});
+
+	return res.send({
+		mode: heCalState.mode,
+		elapsedMs: elapsed,
+		idleDurationMs: HE_MOCK_IDLE_MS,
+		assignedCount: channels.length,
+		movedCount: channels.filter((c) => c.moved).length,
+		channels,
+	});
+});
+
+app.post('/api/applyHECalibration', (req, res) => {
+	heCalState.mode = 'off';
+	return res.send({ mode: 'off', received: req.body });
+});
+
+// --- hall effect binding profiles ---
+let heProfiles = {
+	activeProfile: 0,
+	profiles: Array.from({ length: 4 }, (_, index) => ({
+		enabled: index === 0,
+		// Base profile gets a few sample bindings; alternates start as copies.
+		actions: Array.from({ length: 32 }, (__, channel) =>
+			channel < 8 ? channel + 1 : -10,
+		),
+	})),
+};
+
+app.get('/api/getHETriggerProfiles', (req, res) => {
+	return res.send(heProfiles);
+});
+
+app.post('/api/setHETriggerProfiles', (req, res) => {
+	heProfiles = req.body;
+	return res.send(req.body);
+});
+
 app.get('/api/getBootModeOptions', (req, res) => {
 	return res.send({
 		enabled: false,

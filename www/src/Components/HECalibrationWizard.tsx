@@ -1,0 +1,380 @@
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Button, Col, Modal, ProgressBar, Row, Spinner } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
+import invert from 'lodash/invert';
+
+import WebApi from '../Services/WebApi';
+import { BUTTON_ACTIONS } from '../Data/Pins';
+import { HE_PRESETS, DEFAULT_PRESET_ID, getPreset } from '../Data/HEPresets';
+import useHETriggerStore from '../Store/useHETriggerStore';
+
+import './HECalibration.scss';
+
+const POLL_INTERVAL_MS = 100;
+
+type CalChannel = {
+	id: number;
+	raw: number;
+	idle: number;
+	stdDev: number;
+	maxDeviation: number;
+	moved: boolean;
+	unstable: boolean;
+};
+
+type CalStatus = {
+	mode: 'off' | 'idle' | 'press' | 'done';
+	elapsedMs: number;
+	idleDurationMs: number;
+	channels: CalChannel[];
+	assignedCount: number;
+	movedCount: number;
+	error?: string;
+};
+
+// The addon form values, as supplied by the parent's Formik state.
+type HEFormValues = {
+	muxChannels: number;
+	muxSelectPin0: number;
+	muxSelectPin1: number;
+	muxSelectPin2: number;
+	muxSelectPin3: number;
+	muxADCPin0: number;
+	muxADCPin1: number;
+	muxADCPin2: number;
+	muxADCPin3: number;
+	heTriggerSmoothing: number;
+	heTriggerSmoothingFactor: number;
+};
+
+type Props = {
+	showModal: boolean;
+	setShowModal: (show: boolean) => void;
+	values: HEFormValues;
+};
+
+// Wizard steps
+const STEP_READY = 0;
+const STEP_BASELINE = 1;
+const STEP_PRESS = 2;
+const STEP_FEEL = 3;
+
+const actionLabel = (actionId: number) => {
+	const label = invert(BUTTON_ACTIONS)[actionId];
+	return label ? label.replace('BUTTON_PRESS_', '') : `#${actionId}`;
+};
+
+const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
+	const { t } = useTranslation('');
+	const { triggers, fetchHETriggers } = useHETriggerStore();
+
+	const [step, setStep] = useState(STEP_READY);
+	const [status, setStatus] = useState<CalStatus | null>(null);
+	const [presetId, setPresetId] = useState(DEFAULT_PRESET_ID);
+	const [error, setError] = useState('');
+	const [busy, setBusy] = useState(false);
+	const timerId = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+	const assignedChannels = triggers
+		.map((trigger, index) => ({ trigger, index }))
+		.filter(({ trigger }) => trigger.action !== -10);
+
+	// Where a channel physically lives, for the tile subtitle.
+	const channelLocation = (index: number) => {
+		const muxChannels = values['muxChannels'];
+		if (muxChannels > 1) {
+			return `M${Math.floor(index / muxChannels)}:C${index % muxChannels}`;
+		}
+		return `ADC ${index}`;
+	};
+
+	const stopPolling = () => {
+		if (timerId.current) {
+			clearInterval(timerId.current);
+			timerId.current = undefined;
+		}
+	};
+
+	const poll = async () => {
+		try {
+			const data: CalStatus = await WebApi.getHECalibrationStatus();
+			if (data?.error) {
+				setError(data.error);
+				stopPolling();
+				return;
+			}
+			setStatus(data);
+			// The firmware advances from the idle phase on its own once the sampling
+			// window elapses, so follow its reported mode rather than a local timer.
+			if (data.mode === 'press' && step === STEP_BASELINE) setStep(STEP_PRESS);
+		} catch (e) {
+			setError(String(e));
+			stopPolling();
+		}
+	};
+
+	const startPolling = () => {
+		stopPolling();
+		timerId.current = setInterval(poll, POLL_INTERVAL_MS);
+	};
+
+	// Tear down on unmount so a closed modal cannot keep polling the device.
+	useEffect(() => stopPolling, []);
+
+	useEffect(() => {
+		if (!showModal) {
+			stopPolling();
+			setStep(STEP_READY);
+			setStatus(null);
+			setError('');
+		}
+	}, [showModal]);
+
+	const beginCalibration = async () => {
+		setBusy(true);
+		setError('');
+		try {
+			// Push the current (possibly unsaved) mux/pin config first, so reads work
+			// before the user has committed the addon form.
+			await WebApi.setHETriggerOptions({
+				muxChannels: values['muxChannels'],
+				muxSelectPin0: values['muxSelectPin0'],
+				muxSelectPin1: values['muxSelectPin1'],
+				muxSelectPin2: values['muxSelectPin2'],
+				muxSelectPin3: values['muxSelectPin3'],
+				muxADCPin0: values['muxADCPin0'],
+				muxADCPin1: values['muxADCPin1'],
+				muxADCPin2: values['muxADCPin2'],
+				muxADCPin3: values['muxADCPin3'],
+				heTriggerSmoothing: values['heTriggerSmoothing'],
+				heTriggerSmoothingFactor: values['heTriggerSmoothingFactor'],
+			});
+			const result = await WebApi.startHECalibration();
+			if (result?.error) {
+				setError(result.error);
+				return;
+			}
+			setStep(STEP_BASELINE);
+			startPolling();
+		} catch (e) {
+			setError(String(e));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const finishPressPhase = async () => {
+		setBusy(true);
+		try {
+			await WebApi.advanceHECalibration('finish');
+			stopPolling();
+			setStep(STEP_FEEL);
+		} catch (e) {
+			setError(String(e));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const applyPreset = async () => {
+		setBusy(true);
+		try {
+			const preset = getPreset(presetId);
+			await WebApi.applyHECalibration({
+				actuationPoint: preset.actuationPoint,
+				rtPressSensitivity: preset.rtPressSensitivity,
+				rtReleaseSensitivity: preset.rtReleaseSensitivity,
+				continuousRapidTrigger: preset.continuousRapidTrigger,
+			});
+			await fetchHETriggers();
+			setShowModal(false);
+		} catch (e) {
+			setError(String(e));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const cancel = async () => {
+		stopPolling();
+		try {
+			await WebApi.advanceHECalibration('abort');
+		} catch {
+			// Aborting is best effort; the firmware also times out on its own.
+		}
+		setShowModal(false);
+	};
+
+	const channelById = (id: number) => status?.channels?.find((c) => c.id === id);
+
+	const baselineProgress = status
+		? Math.min(100, Math.round((status.elapsedMs / (status.idleDurationMs || 2000)) * 100))
+		: 0;
+
+	const unstableChannels = (status?.channels || []).filter((c) => c.unstable);
+
+	return (
+		<Modal size="lg" show={showModal} onHide={cancel} className="he-modal">
+			<Modal.Header closeButton>
+				<Modal.Title>{t('HETrigger:wizard-title')}</Modal.Title>
+			</Modal.Header>
+			<Modal.Body>
+				{error && <Alert variant="danger">{error}</Alert>}
+
+				{step === STEP_READY && (
+					<div>
+						<p>{t('HETrigger:wizard-intro')}</p>
+						<p className="text-muted">
+							{t('HETrigger:wizard-assigned-count', {
+								count: assignedChannels.length,
+							})}
+						</p>
+						<div className="he-channel-grid">
+							{assignedChannels.map(({ trigger, index }) => (
+								<div key={`ready-${index}`} className="he-channel-tile">
+									<div className="he-channel-name">
+										{actionLabel(trigger.action as number)}
+									</div>
+									<div className="he-channel-meta">
+										{channelLocation(index)}
+									</div>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
+				{step === STEP_BASELINE && (
+					<div>
+						<h5>{t('HETrigger:wizard-baseline-heading')}</h5>
+						<p>{t('HETrigger:wizard-baseline-body')}</p>
+						<ProgressBar now={baselineProgress} label={`${baselineProgress}%`} />
+						<div className="he-channel-grid mt-3">
+							{assignedChannels.map(({ trigger, index }) => {
+								const channel = channelById(index);
+								return (
+									<div key={`base-${index}`} className="he-channel-tile">
+										<div className="he-channel-name">
+											{actionLabel(trigger.action as number)}
+										</div>
+										<div className="he-channel-value">{channel?.raw ?? '—'}</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				)}
+
+				{step === STEP_PRESS && (
+					<div>
+						<h5>{t('HETrigger:wizard-press-heading')}</h5>
+						<p>{t('HETrigger:wizard-press-body')}</p>
+						{unstableChannels.length > 0 && (
+							<Alert variant="warning">
+								{t('HETrigger:wizard-unstable-warning', {
+									channels: unstableChannels.map((c) => c.id).join(', '),
+								})}
+							</Alert>
+						)}
+						<div className="he-progress-line">
+							{t('HETrigger:wizard-press-progress', {
+								moved: status?.movedCount ?? 0,
+								total: status?.assignedCount ?? assignedChannels.length,
+							})}
+						</div>
+						<div className="he-channel-grid mt-2">
+							{assignedChannels.map(({ trigger, index }) => {
+								const channel = channelById(index);
+								const deviation = Math.abs(channel?.maxDeviation ?? 0);
+								const captured = channel?.moved ?? false;
+								return (
+									<div
+										key={`press-${index}`}
+										className={`he-channel-tile ${captured ? 'captured' : ''}`}
+									>
+										<div className="he-channel-name">
+											{actionLabel(trigger.action as number)}
+										</div>
+										<ProgressBar
+											now={Math.min(100, (deviation / 2000) * 100)}
+											variant={captured ? 'success' : 'secondary'}
+											className="he-channel-bar"
+										/>
+										<div className="he-channel-meta">
+											{captured
+												? t('HETrigger:wizard-captured', { span: deviation })
+												: t('HETrigger:wizard-waiting')}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				)}
+
+				{step === STEP_FEEL && (
+					<div>
+						<h5>{t('HETrigger:wizard-feel-heading')}</h5>
+						<p>{t('HETrigger:wizard-feel-body')}</p>
+						<Row>
+							{HE_PRESETS.map((preset) => (
+								<Col xs={12} md={6} key={preset.id} className="mb-2">
+									<div
+										role="button"
+										tabIndex={0}
+										onClick={() => setPresetId(preset.id)}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') setPresetId(preset.id);
+										}}
+										className={`he-preset-card ${
+											presetId === preset.id ? 'selected' : ''
+										}`}
+									>
+										<div className="he-preset-name">
+											{t(`HETrigger:preset-${preset.id}`)}
+										</div>
+										<div className="he-preset-detail">
+											{t('HETrigger:preset-actuation-label', {
+												percent: preset.actuationPoint,
+											})}
+										</div>
+										<div className="he-preset-desc">
+											{t(`HETrigger:preset-${preset.id}-desc`)}
+										</div>
+									</div>
+								</Col>
+							))}
+						</Row>
+					</div>
+				)}
+			</Modal.Body>
+			<Modal.Footer>
+				<Button variant="secondary" onClick={cancel} disabled={busy}>
+					{t('HETrigger:wizard-cancel')}
+				</Button>
+				{step === STEP_READY && (
+					<Button
+						onClick={beginCalibration}
+						disabled={busy || assignedChannels.length === 0}
+					>
+						{busy && <Spinner size="sm" className="me-2" />}
+						{t('HETrigger:wizard-start')}
+					</Button>
+				)}
+				{step === STEP_PRESS && (
+					<Button onClick={finishPressPhase} disabled={busy}>
+						{t('HETrigger:wizard-finish-press')}
+					</Button>
+				)}
+				{step === STEP_FEEL && (
+					<Button onClick={applyPreset} disabled={busy}>
+						{busy && <Spinner size="sm" className="me-2" />}
+						{t('HETrigger:wizard-apply')}
+					</Button>
+				)}
+			</Modal.Footer>
+		</Modal>
+	);
+};
+
+export default HECalibrationWizard;

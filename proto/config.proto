@@ -880,15 +880,35 @@ message ReactiveLEDOptions
 
 message HETriggerInfo
 {
-    optional GpioAction action = 1;
-    optional int32 active = 2;
+    // int32 rather than GpioAction so that HE-local pseudo-actions (profile
+    // switching, see he_trigger.h) can share this field. Wire-compatible with
+    // the previous GpioAction declaration, so stored configs load unchanged.
+    optional int32 action = 1;
+    optional int32 active = 2 [deprecated = true];
     optional int32 idle = 3;
     optional int32 pressed = 4;
     optional int32 polarity = 5 [deprecated = true];
-    optional int32 release = 6;
+    optional int32 release = 6 [deprecated = true];
     optional int32 noise = 7;
-    optional bool rapidTrigger = 8; 
+    optional bool rapidTrigger = 8;
     optional bool is_polarized = 9;
+
+    // Rapid trigger v2. All of these are PERCENT OF TRAVEL (0-100), resolved
+    // against the idle..pressed span, so they survive recalibration and mean
+    // the same thing on every switch regardless of magnet polarity.
+    optional uint32 actuationPoint         = 10 [(nanopb).int_size = IS_8];
+    optional uint32 rtPressSensitivity     = 11 [(nanopb).int_size = IS_8];
+    optional uint32 rtReleaseSensitivity   = 12 [(nanopb).int_size = IS_8];
+    optional bool   continuousRapidTrigger = 13;
+    optional uint32 travelDeadzone         = 14 [(nanopb).int_size = IS_8];
+}
+
+message HETriggerProfile
+{
+    // Bindings ONLY. Calibration and tuning live in HETriggerInfo and are
+    // shared across every profile.
+    repeated int32 actions = 1 [(nanopb).max_count = 32, (nanopb).int_size = IS_16];
+    optional bool enabled = 2;
 }
 
 message HETriggerOptions
@@ -906,6 +926,11 @@ message HETriggerOptions
     repeated HETriggerInfo triggers = 11 [(nanopb).max_count = 32];
     optional bool emaSmoothing = 12;
     optional int32 smoothingFactor = 13;
+
+    // HE-local binding profiles, independent of the GPIO profile system.
+    // triggers[].action is the base profile (0); profileSets[0..2] are 1..3.
+    repeated HETriggerProfile profileSets = 14 [(nanopb).max_count = 3];
+    optional uint32 activeProfile = 15 [(nanopb).int_size = IS_8];
 }
 
 message AddonOptions
@@ -948,6 +973,7 @@ message MigrationHistory
     optional bool gpioMappingsMigrated = 2 [default = false];
     optional bool buttonProfilesMigrated = 3 [default = false];
     optional bool profileEnabledFlagsMigrated = 4 [default = false];
+    optional bool heTriggerRapidTriggerMigrated = 5 [default = false];
 }
 
 message Config

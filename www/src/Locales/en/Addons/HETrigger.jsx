@@ -62,4 +62,62 @@ export default {
 	'calibration-manual-step': 'Please adjust the following attributes of the hall effect button to the desired amounts. '+
 							    'Once the desired values have been found, you can copy these values and set all triggers '+
 							    'on the device.',
+
+	// Guided calibration wizard
+	'wizard-button': 'Calibrate All Buttons 🧲',
+	'wizard-title': 'Hall-Effect Calibration',
+	'wizard-intro':
+		'This will calibrate every assigned button at once. You will be asked to leave the ' +
+		'controller alone for a couple of seconds, and then to press each button all the way ' +
+		'down once, in any order.',
+	'wizard-assigned-count': '{{count}} assigned button(s) will be calibrated.',
+	'wizard-baseline-heading': 'Step 1 of 3 — Measuring resting position',
+	'wizard-baseline-body': 'Hands off the controller, please. Do not press anything.',
+	'wizard-press-heading': 'Step 2 of 3 — Press every button',
+	'wizard-press-body':
+		'Press each button all the way down, one at a time, in any order. Each tile turns green ' +
+		'once that button has been captured.',
+	'wizard-press-progress': '{{moved}} of {{total}} buttons captured',
+	'wizard-captured': 'Captured ({{span}})',
+	'wizard-waiting': 'Waiting…',
+	'wizard-unstable-warning':
+		'These channels have unusually noisy readings, which usually means a wiring problem: {{channels}}',
+	'wizard-feel-heading': 'Step 3 of 3 — Choose how the buttons should feel',
+	'wizard-feel-body':
+		'This sets how far you have to press before a button registers. You can fine-tune ' +
+		'individual buttons afterwards in the voltage table.',
+	'wizard-start': 'Start Calibration',
+	'wizard-finish-press': 'Done Pressing',
+	'wizard-apply': 'Apply and Save',
+	'wizard-cancel': 'Cancel',
+
+	'preset-actuation-label': 'Actuates at {{percent}}% of travel',
+	'preset-hairpin': 'Hairpin',
+	'preset-hairpin-desc': 'Extremely twitchy. For competitive play where every frame counts.',
+	'preset-light': 'Light',
+	'preset-light-desc': 'Fast and responsive, with a little more room for error.',
+	'preset-standard': 'Standard',
+	'preset-standard-desc': 'A balanced default, comparable to a good mechanical switch.',
+	'preset-deliberate': 'Deliberate',
+	'preset-deliberate-desc': 'Requires a firmer press. Reduces accidental brushes.',
+	'preset-heavy': 'Heavy',
+	'preset-heavy-desc': 'Deepest actuation. Best for noisy rigs or a heavy hand.',
+
+	// Binding profiles
+	'profiles-header': 'Hall-Effect Binding Profiles',
+	'profiles-shared-tuning-note':
+		'Profiles change which action each button sends. Calibration, actuation points and ' +
+		'rapid trigger settings are shared across all profiles.',
+	'profile-base-label': 'Base',
+	'profile-label': 'Profile {{number}}',
+	'profile-enabled-label': 'Enabled (included when cycling profiles)',
+	'profile-base-note':
+		'The base profile is always enabled and is used as the fallback for any button left ' +
+		'unassigned in another profile.',
+	'profiles-save-button': 'Save Binding Profiles',
+	'action-he_profile_cycle': 'Cycle HE Profile',
+	'action-he_profile_1': 'Select HE Profile 1',
+	'action-he_profile_2': 'Select HE Profile 2',
+	'action-he_profile_3': 'Select HE Profile 3',
+	'action-he_profile_4': 'Select HE Profile 4',
 };

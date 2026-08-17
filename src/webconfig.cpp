@@ -35,6 +35,7 @@
 #include "lwip/def.h"
 #include "lwip/mem.h"
 #include "addons/input_macro.h"
+#include "addons/he_trigger.h"
 
 #define PATH_CGI_ACTION "/cgi/action"
 
@@ -1523,7 +1524,10 @@ static Pin_t calibrationADCPins[4];
 static bool calibrationSmoothing = false;
 static uint32_t calibrationSmoothingFactor = 0;
 static float ema_smoothing;
-static uint32_t smoothingRead = 0;
+// One filter state per channel. A single shared accumulator carried the previous
+// channel's level into the next channel's first reads, so switching calibration
+// targets showed a decaying ghost of the old channel.
+static uint16_t smoothingRead[HETRIGGER_COUNT] = {};
 
 // Get the HE Trigger Options using our manual GPIO input and everything
 std::string setHETriggerOptions()
@@ -1629,12 +1633,11 @@ std::string getHETriggerVoltage()
     }
     adc_select_input(adcSelectPin-26);
     // Web-Config triggers getHECalibration every 50ms, game controller triggers <1ms
-    if ( calibrationSmoothing ) {
-        uint16_t read;
+    if ( calibrationSmoothing && id < HETRIGGER_COUNT ) {
+        uint16_t read = adc_read();
         for(int i = 0; i < 50; i++) {
-            read = adc_read();
-            read = emaCalculation(read, smoothingRead);
-            smoothingRead = read;
+            read = emaCalculation(adc_read(), smoothingRead[id]);
+            smoothingRead[id] = read;
         }
         doc["voltage"] = read;
     } else {
@@ -1689,6 +1692,209 @@ std::string setHETriggerCalibrations()
     return serialize_json(doc);
 }
 
+
+// ---------------------------------------------------------------------------
+// Hall effect calibration.
+//
+// The sweep itself lives in HETriggerAddon so it runs at full loop speed; these
+// handlers only start/stop it and report progress. Polling one channel per HTTP
+// request could never see a real press: a 32-channel sweep costs most of a
+// second, while a button press lasts ~100ms.
+// ---------------------------------------------------------------------------
+
+static std::string heCalibrationError(const char* message)
+{
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["error"] = message;
+    return serialize_json(doc);
+}
+
+std::string startHECalibration()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+
+    addon->startCalibration();
+
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["mode"] = "idle";
+    return serialize_json(doc);
+}
+
+std::string advanceHECalibration()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+
+    DynamicJsonDocument postDoc = get_post_data();
+    const char* phase = postDoc["phase"] | "";
+
+    if (strcmp(phase, "press") == 0)       addon->advanceCalibration();
+    else if (strcmp(phase, "finish") == 0) addon->finishCalibration();
+    else if (strcmp(phase, "abort") == 0)  addon->abortCalibration();
+    else return heCalibrationError("unknown phase");
+
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["mode"] = (int)addon->getCalibrationMode();
+    return serialize_json(doc);
+}
+
+std::string getHECalibrationStatus()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+
+    // Only assigned channels are reported, but size for the worst case: ArduinoJson
+    // truncates silently on overflow, which would look like channels vanishing.
+    const size_t capacity = JSON_ARRAY_SIZE(HETRIGGER_COUNT) +
+                            HETRIGGER_COUNT * JSON_OBJECT_SIZE(8) +
+                            JSON_OBJECT_SIZE(8);
+    DynamicJsonDocument doc(capacity);
+
+    switch (addon->getCalibrationMode()) {
+        case HECalMode::OFF:           doc["mode"] = "off"; break;
+        case HECalMode::IDLE_BASELINE: doc["mode"] = "idle"; break;
+        case HECalMode::PRESS_CAPTURE: doc["mode"] = "press"; break;
+        case HECalMode::DONE:          doc["mode"] = "done"; break;
+    }
+    doc["elapsedMs"] = addon->getCalibrationElapsedMs();
+    doc["idleDurationMs"] = HETRIGGER_CAL_IDLE_MS;
+
+    uint32_t assignedCount = 0;
+    uint32_t movedCount = 0;
+    JsonArray channels = doc.createNestedArray("channels");
+    for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+        if (!addon->isChannelAssigned(he)) continue;
+        assignedCount++;
+
+        const HECalChannel& source = addon->getCalibrationChannel(he);
+        if (source.moved) movedCount++;
+
+        JsonObject channel = channels.createNestedObject();
+        channel["id"] = he;
+        channel["raw"] = source.lastRaw;
+        channel["idle"] = source.idleMean;
+        channel["stdDev"] = source.idleStdDev;
+        channel["maxDeviation"] = source.maxDeviation;
+        channel["moved"] = source.moved;
+        channel["unstable"] = source.unstable;
+    }
+    doc["assignedCount"] = assignedCount;
+    doc["movedCount"] = movedCount;
+
+    return serialize_json(doc);
+}
+
+std::string applyHECalibration()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+
+    DynamicJsonDocument postDoc = get_post_data();
+
+    // Presets resolve to concrete percentages on the web side; the firmware stores
+    // only the resolved values, so it has a single code path and per-button
+    // hand-tuning stays first class.
+    const uint8_t actuation = postDoc["actuationPoint"] | 35;
+    const uint8_t press     = postDoc["rtPressSensitivity"] | 10;
+    const uint8_t release   = postDoc["rtReleaseSensitivity"] | 10;
+    const bool continuousRT = postDoc["continuousRapidTrigger"] | false;
+
+    addon->applyCalibration(actuation, press, release, continuousRT);
+
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["mode"] = "off";
+    return serialize_json(doc);
+}
+
+// ---------------------------------------------------------------------------
+// Hall effect binding profiles.
+//
+// These carry bindings only -- calibration and tuning stay in HETriggerInfo and
+// are shared across every profile. Profile 0 is the base binding set stored in
+// triggers[].action; profiles 1..3 live in profileSets[0..2].
+// ---------------------------------------------------------------------------
+
+std::string getHETriggerProfiles()
+{
+    // Sized generously on purpose: ArduinoJson truncates silently when it runs out
+    // of capacity, which would look like profiles or bindings quietly vanishing
+    // rather than an error.
+    const size_t capacity = JSON_OBJECT_SIZE(4) +
+                            JSON_ARRAY_SIZE(HE_PROFILE_COUNT) +
+                            HE_PROFILE_COUNT * (JSON_OBJECT_SIZE(4) + JSON_ARRAY_SIZE(HETRIGGER_COUNT)) +
+                            256;
+    DynamicJsonDocument doc(capacity);
+
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+
+    doc["activeProfile"] = options.activeProfile;
+
+    JsonArray profileList = doc.createNestedArray("profiles");
+
+    // Profile 0 is the base binding set, and is always enabled.
+    JsonObject base = profileList.createNestedObject();
+    base["enabled"] = true;
+    JsonArray baseActions = base.createNestedArray("actions");
+    for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+        baseActions.add(options.triggers[i].action);
+    }
+
+    for (uint16_t p = 0; p < options.profileSets_count; p++) {
+        JsonObject profile = profileList.createNestedObject();
+        profile["enabled"] = options.profileSets[p].enabled;
+        JsonArray actions = profile.createNestedArray("actions");
+        for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+            actions.add(i < options.profileSets[p].actions_count
+                            ? options.profileSets[p].actions[i]
+                            : (int32_t)GpioAction::NONE);
+        }
+    }
+
+    return serialize_json(doc);
+}
+
+std::string setHETriggerProfiles()
+{
+    DynamicJsonDocument doc = get_post_data();
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+
+    // Index 0 in the incoming array is the base profile, which is stored on the
+    // triggers themselves rather than in profileSets.
+    if (doc["profiles"][0]["actions"].is<JsonArray>()) {
+        for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+            options.triggers[i].action = doc["profiles"][0]["actions"][i];
+            options.triggers[i].has_action = true;
+        }
+        options.triggers_count = HETRIGGER_COUNT;
+    }
+
+    for (uint16_t p = 0; p < HE_PROFILE_COUNT - 1; p++) {
+        JsonVariant profile = doc["profiles"][p + 1];
+        if (!profile["actions"].is<JsonArray>()) continue;
+
+        for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+            options.profileSets[p].actions[i] = profile["actions"][i];
+        }
+        // reminder that this must be set or else nanopb won't retain anything
+        options.profileSets[p].actions_count = HETRIGGER_COUNT;
+        options.profileSets[p].enabled = profile["enabled"] | false;
+        options.profileSets[p].has_enabled = true;
+    }
+    options.profileSets_count = HE_PROFILE_COUNT - 1;
+
+    if (doc["activeProfile"].is<int>()) {
+        const uint8_t requested = doc["activeProfile"];
+        if (requested < HE_PROFILE_COUNT) {
+            options.activeProfile = requested;
+            options.has_activeProfile = true;
+        }
+    }
+
+    EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(true));
+
+    return serialize_json(doc);
+}
 
 std::string getReactiveLEDs()
 {
@@ -2747,6 +2953,12 @@ static const std::pair<const char*, HandlerFuncPtr> handlerFuncs[] =
     { "/api/getHETriggerCalibrations", getHETriggerCalibrations },
     { "/api/getHETriggerVoltage", getHETriggerVoltage },
     { "/api/setHETriggerOptions", setHETriggerOptions },
+    { "/api/startHECalibration", startHECalibration },
+    { "/api/advanceHECalibration", advanceHECalibration },
+    { "/api/getHECalibrationStatus", getHECalibrationStatus },
+    { "/api/applyHECalibration", applyHECalibration },
+    { "/api/getHETriggerProfiles", getHETriggerProfiles },
+    { "/api/setHETriggerProfiles", setHETriggerProfiles },
     { "/api/setReactiveLEDs", setReactiveLEDs },
     { "/api/getReactiveLEDs", getReactiveLEDs },
     { "/api/setKeyMappings", setKeyMappings },

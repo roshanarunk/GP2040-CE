@@ -12,6 +12,29 @@ export type Trigger = {
 	release: number;
 	noise: number;
 	rapidTrigger: boolean;
+	// Rapid trigger v2. These are percentages of the idle->pressed travel, so they
+	// stay meaningful across different switches and survive recalibration.
+	actuationPoint: number;
+	rtPressSensitivity: number;
+	rtReleaseSensitivity: number;
+	continuousRapidTrigger: boolean;
+	travelDeadzone: number;
+};
+
+export const DEFAULT_TRIGGER: Trigger = {
+	action: -10 as PinActionValues,
+	idle: 150,
+	active: 2000,
+	pressed: 3500,
+	is_polarized: false,
+	release: 2000,
+	noise: 30,
+	rapidTrigger: false,
+	actuationPoint: 35,
+	rtPressSensitivity: 10,
+	rtReleaseSensitivity: 10,
+	continuousRapidTrigger: false,
+	travelDeadzone: 3,
 };
 
 type State = {
@@ -27,16 +50,10 @@ type Actions = {
 };
 
 const INITIAL_STATE: State = {
-    triggers: Array(32).map(()=>({ 
-		action:-10,
-		idle:100,
-		active:2000,
-		pressed:3500,
-		is_polarized: false,
-		release:2000,
-		noise:50,
-		rapidTrigger:false
-	})),
+	// Array(32) creates holes, and .map() skips holes -- the previous form produced
+	// 32 empty slots rather than 32 defaults, so any render before the fetch
+	// resolved would read undefined. Array.from actually populates.
+	triggers: Array.from({ length: 32 }, () => ({ ...DEFAULT_TRIGGER })),
 	loadingTriggers: false,
 };
 

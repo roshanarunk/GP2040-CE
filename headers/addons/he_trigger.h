@@ -993,6 +993,9 @@ public:
     // speed. A 32-channel sweep over HTTP would take most of a second per pass,
     // which is longer than a button press, so presses would simply be missed.
     void startCalibration();
+    // Samples every assigned channel once. Called from preprocess() in gamepad
+    // mode, and directly from the config-mode loop, which skips add-ons.
+    void runCalibrationSweep();
     void advanceCalibration();          // idle baseline -> press capture
     void finishCalibration();           // press capture -> done
     void abortCalibration();

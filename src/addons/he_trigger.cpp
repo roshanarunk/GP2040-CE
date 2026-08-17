@@ -399,6 +399,28 @@ void HETriggerAddon::startCalibration() {
     for(uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
         calData[he] = HECalChannel{};
     }
+
+    // Re-read the mux/ADC pins from config. setup() cached them at boot from the
+    // saved config, but the wizard pushes the current form values (which may not
+    // be saved yet) before starting, so the cached copies can be stale.
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+    muxPinArray[0] = options.muxADCPin0;
+    muxPinArray[1] = options.muxADCPin1;
+    muxPinArray[2] = options.muxADCPin2;
+    muxPinArray[3] = options.muxADCPin3;
+    selectPinArray[0] = options.selectPin0;
+    selectPinArray[1] = options.selectPin1;
+    selectPinArray[2] = options.selectPin2;
+    selectPinArray[3] = options.selectPin3;
+    switch(options.muxChannels) {
+        case 4:  this->selectPins = 2; break;
+        case 8:  this->selectPins = 3; break;
+        case 16: this->selectPins = 4; break;
+        case 1:
+        default: this->selectPins = 0; break;
+    }
+    lastADCSelected = -1;
+
     calMode = HECalMode::IDLE_BASELINE;
     calPhaseStart = get_absolute_time();
     calTimeout = make_timeout_time_ms(HETRIGGER_CAL_TIMEOUT_MS);
@@ -555,46 +577,58 @@ void HETriggerAddon::applyCalibration(uint8_t actuationPercent, uint8_t pressPer
     EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(true));
 }
 
+// Sweep every assigned channel once and fold the readings into the calibration
+// accumulators. This is deliberately separate from preprocess(): calibration is
+// driven from the web config, and the config-mode main loop skips core0 add-ons
+// entirely (see GP2040::run), so preprocess() never runs while the wizard is
+// open. GP2040::run calls this directly in that mode instead.
+void HETriggerAddon::runCalibrationSweep() {
+    if (calMode == HECalMode::OFF) return;
+
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+
+    if (time_reached(calTimeout)) {
+        abortCalibration();
+        return;
+    }
+
+    if (calMode == HECalMode::IDLE_BASELINE &&
+            getCalibrationElapsedMs() >= HETRIGGER_CAL_IDLE_MS) {
+        advanceCalibration();
+    }
+
+    if (calMode == HECalMode::DONE) return;
+
+    for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+        if (!isChannelAssigned(he)) continue;
+
+        const uint32_t channel  = (options.muxChannels <= 1) ? 0 : (he % options.muxChannels);
+        const uint32_t adcIndex = (options.muxChannels <= 1) ? he : (he / options.muxChannels);
+        if (adcIndex >= 4) continue;
+        if (muxPinArray[adcIndex] < 26 || muxPinArray[adcIndex] > 29) continue;
+
+        if (options.muxChannels > 1) selectChannel(channel);
+        if (lastADCSelected != muxPinArray[adcIndex]) {
+            adc_select_input(muxPinArray[adcIndex] - 26);
+            lastADCSelected = muxPinArray[adcIndex];
+        }
+        busy_wait_us_32(HETRIGGER_SETTLE_US);
+
+        // Deliberately unsmoothed: the EMA filter would attenuate exactly the
+        // brief peak of a fast press that the capture phase is looking for.
+        accumulateCalibration(he, adc_read());
+    }
+}
+
 void HETriggerAddon::preprocess() {
     Gamepad * gamepad = Storage::getInstance().GetGamepad();
     HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
 
-    // Calibration takes over the sampling loop entirely: it sweeps every assigned
-    // channel and accumulates statistics instead of producing input. Gamepad
-    // output stays suppressed throughout, so mashing buttons during the press
-    // phase cannot leak into a game.
+    // Calibration takes over the sampling loop entirely: it accumulates statistics
+    // instead of producing input, so mashing buttons during the press phase cannot
+    // leak into a game.
     if (calMode != HECalMode::OFF) {
-        if (time_reached(calTimeout)) {
-            abortCalibration();
-            return;
-        }
-
-        if (calMode == HECalMode::IDLE_BASELINE &&
-                getCalibrationElapsedMs() >= HETRIGGER_CAL_IDLE_MS) {
-            advanceCalibration();
-        }
-
-        if (calMode == HECalMode::DONE) return;
-
-        for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
-            if (!isChannelAssigned(he)) continue;
-
-            const uint32_t channel  = (options.muxChannels <= 1) ? 0 : (he % options.muxChannels);
-            const uint32_t adcIndex = (options.muxChannels <= 1) ? he : (he / options.muxChannels);
-            if (adcIndex >= 4) continue;
-            if (muxPinArray[adcIndex] < 26 || muxPinArray[adcIndex] > 29) continue;
-
-            if (options.muxChannels > 1) selectChannel(channel);
-            if (lastADCSelected != muxPinArray[adcIndex]) {
-                adc_select_input(muxPinArray[adcIndex] - 26);
-                lastADCSelected = muxPinArray[adcIndex];
-            }
-            busy_wait_us_32(HETRIGGER_SETTLE_US);
-
-            // Deliberately unsmoothed: the EMA filter would attenuate exactly the
-            // brief peak of a fast press that the capture phase is looking for.
-            accumulateCalibration(he, adc_read());
-        }
+        runCalibrationSweep();
         return;
     }
 

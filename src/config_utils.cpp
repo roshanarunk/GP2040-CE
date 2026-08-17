@@ -1586,7 +1586,7 @@ void migrateHETriggerRapidTrigger(Config& config) {
 
         // Old actuation threshold -> percent of travel.
         const int32_t actuationPercent = ((trigger.active - trigger.idle) * 100) / span;
-        trigger.actuationPoint = (uint8_t)std::min(std::max(actuationPercent, (int32_t)5), (int32_t)90);
+        trigger.actuationPoint = (uint32_t)std::min(std::max(actuationPercent, (int32_t)5), (int32_t)90);
         trigger.has_actuationPoint = true;
 
         // The old release threshold sat below the actuation threshold; that gap is
@@ -1594,14 +1594,14 @@ void migrateHETriggerRapidTrigger(Config& config) {
         // and use it for both directions.
         const int32_t releaseGapPercent = ((trigger.active - trigger.release) * 100) / span;
         const int32_t sensitivity = std::min(std::max(releaseGapPercent, (int32_t)3), (int32_t)40);
-        trigger.rtReleaseSensitivity = (uint8_t)sensitivity;
-        trigger.rtPressSensitivity = (uint8_t)sensitivity;
+        trigger.rtReleaseSensitivity = (uint32_t)sensitivity;
+        trigger.rtPressSensitivity = (uint32_t)sensitivity;
         trigger.has_rtReleaseSensitivity = true;
         trigger.has_rtPressSensitivity = true;
 
         // Old absolute noise floor -> deadzone percent.
         const int32_t deadzonePercent = (trigger.noise * 100) / absSpan;
-        trigger.travelDeadzone = (uint8_t)std::min(std::max(deadzonePercent, (int32_t)2), (int32_t)15);
+        trigger.travelDeadzone = (uint32_t)std::min(std::max(deadzonePercent, (int32_t)2), (int32_t)15);
         trigger.has_travelDeadzone = true;
 
         trigger.continuousRapidTrigger = false;

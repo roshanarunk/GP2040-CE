@@ -530,7 +530,7 @@ void HETriggerAddon::applyCalibration(uint8_t actuationPercent, uint8_t pressPer
         int32_t deadzone = (span > 0) ? ((noise * 100) / span) : 3;
         if (deadzone < 2) deadzone = 2;
         if (deadzone > 10) deadzone = 10;
-        trigger.travelDeadzone = (uint8_t)deadzone;
+        trigger.travelDeadzone = (uint32_t)deadzone;
         trigger.has_travelDeadzone = true;
 
         trigger.actuationPoint = actuationPercent;

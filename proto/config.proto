@@ -896,18 +896,24 @@ message HETriggerInfo
     // Rapid trigger v2. All of these are PERCENT OF TRAVEL (0-100), resolved
     // against the idle..pressed span, so they survive recalibration and mean
     // the same thing on every switch regardless of magnet polarity.
-    optional uint32 actuationPoint         = 10 [(nanopb).int_size = IS_8];
-    optional uint32 rtPressSensitivity     = 11 [(nanopb).int_size = IS_8];
-    optional uint32 rtReleaseSensitivity   = 12 [(nanopb).int_size = IS_8];
+    //
+    // These would fit in a uint8, but (nanopb).int_size cannot be used anywhere
+    // in this config: the JSON serializer in config_utils.cpp is macro-generated
+    // from the protobuf type, so a UINT32 field is always passed to overloads
+    // taking uint32_t. A narrowed C type fails to bind, and no field in this
+    // proto uses int_size for that reason.
+    optional uint32 actuationPoint         = 10;
+    optional uint32 rtPressSensitivity     = 11;
+    optional uint32 rtReleaseSensitivity   = 12;
     optional bool   continuousRapidTrigger = 13;
-    optional uint32 travelDeadzone         = 14 [(nanopb).int_size = IS_8];
+    optional uint32 travelDeadzone         = 14;
 }
 
 message HETriggerProfile
 {
     // Bindings ONLY. Calibration and tuning live in HETriggerInfo and are
     // shared across every profile.
-    repeated int32 actions = 1 [(nanopb).max_count = 32, (nanopb).int_size = IS_16];
+    repeated int32 actions = 1 [(nanopb).max_count = 32];
     optional bool enabled = 2;
 }
 
@@ -930,7 +936,7 @@ message HETriggerOptions
     // HE-local binding profiles, independent of the GPIO profile system.
     // triggers[].action is the base profile (0); profileSets[0..2] are 1..3.
     repeated HETriggerProfile profileSets = 14 [(nanopb).max_count = 3];
-    optional uint32 activeProfile = 15 [(nanopb).int_size = IS_8];
+    optional uint32 activeProfile = 15;
 }
 
 message AddonOptions

@@ -1653,7 +1653,7 @@ std::string getHETriggerCalibrations()
     // ArduinoJson truncates silently on overflow, so this must not be tight.
     const size_t capacity = JSON_OBJECT_SIZE(2) +
                             JSON_ARRAY_SIZE(HETRIGGER_COUNT) +
-                            HETRIGGER_COUNT * JSON_OBJECT_SIZE(14) +
+                            HETRIGGER_COUNT * JSON_OBJECT_SIZE(16) +
                             512;
     DynamicJsonDocument doc(capacity);
 
@@ -1677,6 +1677,7 @@ std::string getHETriggerCalibrations()
         trigger["rtReleaseSensitivity"] = heTriggers[i].rtReleaseSensitivity;
         trigger["continuousRapidTrigger"] = heTriggers[i].continuousRapidTrigger;
         trigger["travelDeadzone"] = heTriggers[i].travelDeadzone;
+        trigger["analogProportional"] = heTriggers[i].analogProportional;
     }
 
     return serialize_json(doc);
@@ -1711,6 +1712,8 @@ std::string setHETriggerCalibrations()
             doc["triggers"][i]["continuousRapidTrigger"] | heTriggers[i].continuousRapidTrigger;
         heTriggers[i].travelDeadzone =
             doc["triggers"][i]["travelDeadzone"] | heTriggers[i].travelDeadzone;
+        heTriggers[i].analogProportional =
+            doc["triggers"][i]["analogProportional"] | heTriggers[i].analogProportional;
     }
 
     Storage::getInstance().getAddonOptions().heTriggerOptions.triggers_count = 32;

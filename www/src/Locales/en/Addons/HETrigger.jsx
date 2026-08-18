@@ -96,16 +96,8 @@ export default {
 	'wizard-cancel': 'Cancel',
 
 	'preset-actuation-label': 'Actuates at {{percent}}% of travel',
-	'preset-hairpin': 'Hairpin',
-	'preset-hairpin-desc': 'Extremely twitchy. For competitive play where every frame counts.',
-	'preset-light': 'Light',
-	'preset-light-desc': 'Fast and responsive, with a little more room for error.',
-	'preset-standard': 'Standard',
-	'preset-standard-desc': 'A balanced default, comparable to a good mechanical switch.',
-	'preset-deliberate': 'Deliberate',
-	'preset-deliberate-desc': 'Requires a firmer press. Reduces accidental brushes.',
-	'preset-heavy': 'Heavy',
-	'preset-heavy-desc': 'Deepest actuation. Best for noisy rigs or a heavy hand.',
+	'preset-level': 'Level {{level}}',
+	'preset-level-desc': 'Rapid trigger reacts to {{press}}% of travel',
 
 	// Live test view
 	'monitor-header': 'Test Your Switches',
@@ -139,6 +131,12 @@ export default {
 		'it when cycling.',
 	'mux-group-label': 'Multiplexer {{index}} (ADC {{pin}})',
 	'direct-group-label': 'Direct (ADC {{pin}})',
+	'sensitivity-title': 'Sensitivity level (1 = lightest, 10 = deepest)',
+	'sensitivity-option': 'L{{level}} · {{percent}}%',
+	'sensitivity-custom': 'Custom',
+	'analog-switch-label': 'Analog',
+	'analog-switch-title':
+		'Drive the stick by how far the switch is pressed, instead of snapping to full tilt.',
 	'rapid-trigger-switch-label': 'RT',
 	'rapid-trigger-needs-calibration':
 		'Calibrate this switch before enabling rapid trigger.',

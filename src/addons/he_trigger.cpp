@@ -494,7 +494,7 @@ void HETriggerAddon::startMonitor() {
     for(uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
         triggerActive[he] = false;
         rtArmed[he] = false;
-        monitorTravel[he] = 0;
+        lastTravel[he] = 0;
     }
     calMode = HECalMode::MONITOR;
     calTimeout = make_timeout_time_ms(HETRIGGER_CAL_TIMEOUT_MS);
@@ -676,7 +676,7 @@ void HETriggerAddon::runCalibrationSweep() {
             }
 
             const int16_t travel = toTravel(he, value);
-            monitorTravel[he] = travel;
+            lastTravel[he] = travel;
             updateTrigger(he, travel);
         }
         return;
@@ -760,6 +760,7 @@ void HETriggerAddon::preprocess() {
         }
 
         const int16_t travel = toTravel(he, value);
+        lastTravel[he] = travel;
 
         updateTrigger(he, travel);
 
@@ -789,7 +790,44 @@ void HETriggerAddon::preprocess() {
     updateProfilePersistence();
 }
 
+// Scales travel into a joystick axis deflection. Travel below the actuation
+// point produces no deflection at all, so the stick stays centred until the
+// switch would have registered as pressed; past that it ramps to full over the
+// remaining travel.
+uint16_t HETriggerAddon::analogDeflection(uint8_t he, bool positive) {
+    const int16_t travel = lastTravel[he];
+    const int16_t actuation = actuationTravel[he];
+
+    int32_t range = TRAVEL_MAX - actuation;
+    if (range <= 0) range = 1;
+
+    int32_t scaled = ((int32_t)travel - actuation) * GAMEPAD_JOYSTICK_MID / range;
+    if (scaled < 0) scaled = 0;
+    if (scaled > GAMEPAD_JOYSTICK_MID) scaled = GAMEPAD_JOYSTICK_MID;
+
+    return positive ? (uint16_t)(GAMEPAD_JOYSTICK_MID + scaled)
+                    : (uint16_t)(GAMEPAD_JOYSTICK_MID - scaled);
+}
+
 void HETriggerAddon::applyAction(Gamepad * gamepad, uint8_t he, int32_t action) {
+    // Proportional analog output: drive the axis by how far the switch is
+    // pressed instead of slamming it to the rail.
+    HETriggerInfo & trigger =
+        Storage::getInstance().getAddonOptions().heTriggerOptions.triggers[he];
+    if (trigger.analogProportional) {
+        switch (action) {
+            case GpioAction::ANALOG_DIRECTION_LS_X_NEG: gamepad->state.lx = analogDeflection(he, false); return;
+            case GpioAction::ANALOG_DIRECTION_LS_X_POS: gamepad->state.lx = analogDeflection(he, true);  return;
+            case GpioAction::ANALOG_DIRECTION_LS_Y_NEG: gamepad->state.ly = analogDeflection(he, false); return;
+            case GpioAction::ANALOG_DIRECTION_LS_Y_POS: gamepad->state.ly = analogDeflection(he, true);  return;
+            case GpioAction::ANALOG_DIRECTION_RS_X_NEG: gamepad->state.rx = analogDeflection(he, false); return;
+            case GpioAction::ANALOG_DIRECTION_RS_X_POS: gamepad->state.rx = analogDeflection(he, true);  return;
+            case GpioAction::ANALOG_DIRECTION_RS_Y_NEG: gamepad->state.ry = analogDeflection(he, false); return;
+            case GpioAction::ANALOG_DIRECTION_RS_Y_POS: gamepad->state.ry = analogDeflection(he, true);  return;
+            default: break;
+        }
+    }
+
     switch (action) {
         case GpioAction::BUTTON_PRESS_UP: gamepad->state.dpad |= GAMEPAD_MASK_UP; break;
         case GpioAction::BUTTON_PRESS_DOWN: gamepad->state.dpad |= GAMEPAD_MASK_DOWN; break;

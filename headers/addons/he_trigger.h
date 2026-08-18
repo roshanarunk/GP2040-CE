@@ -1013,7 +1013,7 @@ public:
     void stopMonitor();
     bool isMonitoring() { return calMode == HECalMode::MONITOR; }
     // Live per-channel state for the test view.
-    int16_t getChannelTravel(uint8_t he) { return monitorTravel[he]; }
+    int16_t getChannelTravel(uint8_t he) { return lastTravel[he]; }
     bool isChannelActive(uint8_t he) { return triggerActive[he]; }
     HECalMode getCalibrationMode() { return calMode; }
     uint32_t getCalibrationElapsedMs();
@@ -1034,6 +1034,7 @@ private:
     // Resolves the binding for a channel under the active profile.
     int32_t actionFor(uint8_t he);
     void applyAction(Gamepad* gamepad, uint8_t he, int32_t action);
+    uint16_t analogDeflection(uint8_t he, bool positive);
     // Commits a pending profile change once cycling has settled.
     void updateProfilePersistence();
     // Accumulates one sample into the calibration state for a channel.
@@ -1075,7 +1076,10 @@ private:
     absolute_time_t profileSaveDeadline = {};
 
     HECalMode calMode = HECalMode::OFF;
-    int16_t monitorTravel[HETRIGGER_COUNT] = {};
+    // Most recent travel per channel, in 0..TRAVEL_MAX. Written on every sample
+    // in both the gamepad and monitor paths: the test view reports it, and
+    // proportional analog output scales the axis by it.
+    int16_t lastTravel[HETRIGGER_COUNT] = {};
     HECalChannel calData[HETRIGGER_COUNT] = {};
     absolute_time_t calPhaseStart = {};
     absolute_time_t calTimeout = {};

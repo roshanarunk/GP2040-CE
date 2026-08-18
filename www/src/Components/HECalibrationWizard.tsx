@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Col, Modal, ProgressBar, Row, Spinner } from 'react-bootstrap';
+import {
+	Alert,
+	Button,
+	Col,
+	Modal,
+	ProgressBar,
+	Row,
+	Spinner,
+} from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
 import invert from 'lodash/invert';
 
 import WebApi from '../Services/WebApi';
 import { BUTTON_ACTIONS } from '../Data/Pins';
-import { HE_PRESETS, DEFAULT_PRESET_ID, getPreset } from '../Data/HEPresets';
+import { HE_PRESETS, DEFAULT_PRESET_LEVEL, getPreset } from '../Data/HEPresets';
 import useHETriggerStore from '../Store/useHETriggerStore';
 
 import './HECalibration.scss';
@@ -70,7 +78,7 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 
 	const [step, setStep] = useState(STEP_READY);
 	const [status, setStatus] = useState<CalStatus | null>(null);
-	const [presetId, setPresetId] = useState(DEFAULT_PRESET_ID);
+	const [presetLevel, setPresetLevel] = useState(DEFAULT_PRESET_LEVEL);
 	const [error, setError] = useState('');
 	const [busy, setBusy] = useState(false);
 	const timerId = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -113,7 +121,9 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 			// initial value and never match. Deriving the step from the reported mode
 			// inside the updater keeps it correct regardless of when poll() was made.
 			if (data.mode === 'press') {
-				setStep((current) => (current === STEP_BASELINE ? STEP_PRESS : current));
+				setStep((current) =>
+					current === STEP_BASELINE ? STEP_PRESS : current,
+				);
 			}
 		} catch (e) {
 			setError(String(e));
@@ -195,7 +205,7 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 	const applyPreset = async () => {
 		setBusy(true);
 		try {
-			const preset = getPreset(presetId);
+			const preset = getPreset(presetLevel);
 			await WebApi.applyHECalibration({
 				actuationPoint: preset.actuationPoint,
 				rtPressSensitivity: preset.rtPressSensitivity,
@@ -221,10 +231,14 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 		setShowModal(false);
 	};
 
-	const channelById = (id: number) => status?.channels?.find((c) => c.id === id);
+	const channelById = (id: number) =>
+		status?.channels?.find((c) => c.id === id);
 
 	const baselineProgress = status
-		? Math.min(100, Math.round((status.elapsedMs / (status.idleDurationMs || 2000)) * 100))
+		? Math.min(
+				100,
+				Math.round((status.elapsedMs / (status.idleDurationMs || 2000)) * 100),
+			)
 		: 0;
 
 	const unstableChannels = (status?.channels || []).filter((c) => c.unstable);
@@ -264,7 +278,10 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 					<div>
 						<h5>{t('HETrigger:wizard-baseline-heading')}</h5>
 						<p>{t('HETrigger:wizard-baseline-body')}</p>
-						<ProgressBar now={baselineProgress} label={`${baselineProgress}%`} />
+						<ProgressBar
+							now={baselineProgress}
+							label={`${baselineProgress}%`}
+						/>
 						<div className="he-channel-grid mt-3">
 							{assignedChannels.map(({ trigger, index }) => {
 								const channel = channelById(index);
@@ -273,7 +290,9 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 										<div className="he-channel-name">
 											{actionLabel(trigger.action as number)}
 										</div>
-										<div className="he-channel-value">{channel?.raw ?? '—'}</div>
+										<div className="he-channel-value">
+											{channel?.raw ?? '—'}
+										</div>
 									</div>
 								);
 							})}
@@ -334,20 +353,21 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 						<p>{t('HETrigger:wizard-feel-body')}</p>
 						<Row>
 							{HE_PRESETS.map((preset) => (
-								<Col xs={12} md={6} key={preset.id} className="mb-2">
+								<Col xs={6} md={4} key={preset.level} className="mb-2">
 									<div
 										role="button"
 										tabIndex={0}
-										onClick={() => setPresetId(preset.id)}
+										onClick={() => setPresetLevel(preset.level)}
 										onKeyDown={(e) => {
-											if (e.key === 'Enter' || e.key === ' ') setPresetId(preset.id);
+											if (e.key === 'Enter' || e.key === ' ')
+												setPresetLevel(preset.level);
 										}}
 										className={`he-preset-card ${
-											presetId === preset.id ? 'selected' : ''
+											presetLevel === preset.level ? 'selected' : ''
 										}`}
 									>
 										<div className="he-preset-name">
-											{t(`HETrigger:preset-${preset.id}`)}
+											{t('HETrigger:preset-level', { level: preset.level })}
 										</div>
 										<div className="he-preset-detail">
 											{t('HETrigger:preset-actuation-label', {
@@ -355,7 +375,9 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 											})}
 										</div>
 										<div className="he-preset-desc">
-											{t(`HETrigger:preset-${preset.id}-desc`)}
+											{t('HETrigger:preset-level-desc', {
+												press: preset.rtPressSensitivity,
+											})}
 										</div>
 									</div>
 								</Col>

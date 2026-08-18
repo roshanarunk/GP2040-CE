@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, FormCheck, Nav, Tab } from 'react-bootstrap';
+import { Alert, Button, Form, FormCheck, Nav, Tab } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
 
 import CustomSelect from './CustomSelect';
@@ -7,6 +7,7 @@ import useHEProfileStore, {
 	HE_PROFILE_COUNT,
 } from '../Store/useHEProfileStore';
 import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
+import { HE_PRESETS, getPreset, matchPreset } from '../Data/HEPresets';
 
 type Option = { label: string; value: number };
 
@@ -76,6 +77,44 @@ const HEProfileSelector = ({
 			rapidTrigger: !trigger.rapidTrigger,
 		});
 	};
+
+	// Applies a whole sensitivity level to one switch. The level itself is not
+	// stored -- only the values it resolves to -- so hand tuning stays possible and
+	// the firmware keeps a single code path.
+	const setSensitivity = (channel: number, level: number) => {
+		const trigger = triggers[channel] as Trigger;
+		if (!trigger) return;
+		const preset = getPreset(level);
+		setHETrigger({
+			id: channel,
+			...trigger,
+			actuationPoint: preset.actuationPoint,
+			rtPressSensitivity: preset.rtPressSensitivity,
+			rtReleaseSensitivity: preset.rtReleaseSensitivity,
+			continuousRapidTrigger: preset.continuousRapidTrigger,
+		});
+	};
+
+	// Which level a switch currently sits on, or 0 for hand-tuned values.
+	const sensitivityLevel = (channel: number) => {
+		const trigger = triggers[channel] as Trigger;
+		if (!trigger) return 0;
+		return matchPreset(trigger)?.level ?? 0;
+	};
+
+	const toggleAnalogProportional = (channel: number) => {
+		const trigger = triggers[channel] as Trigger;
+		if (!trigger) return;
+		setHETrigger({
+			id: channel,
+			...trigger,
+			analogProportional: !trigger.analogProportional,
+		});
+	};
+
+	// Only the analog stick directions can be driven proportionally; for an
+	// ordinary button action there is nothing to scale.
+	const isAnalogAction = (action: number) => action >= 59 && action <= 66;
 
 	// A channel with no measured travel has never been calibrated, and enabling
 	// rapid trigger on it would do nothing useful.
@@ -192,6 +231,53 @@ const HEProfileSelector = ({
 										    profile, so they are only offered on the base tab. */}
 														{profileIndex === 0 && (
 															<>
+																{/* Per-switch sensitivity: applies a level's worth of actuation
+																    and rapid trigger values at once. */}
+																<Form.Select
+																	size="sm"
+																	className="he-binding-sens"
+																	value={sensitivityLevel(channel)}
+																	disabled={!isCalibrated(channel)}
+																	onChange={(e) =>
+																		setSensitivity(
+																			channel,
+																			Number(e.target.value),
+																		)
+																	}
+																	title={t('HETrigger:sensitivity-title')}
+																>
+																	{sensitivityLevel(channel) === 0 && (
+																		<option value={0}>
+																			{t('HETrigger:sensitivity-custom')}
+																		</option>
+																	)}
+																	{HE_PRESETS.map((preset) => (
+																		<option
+																			key={`sens-${preset.level}`}
+																			value={preset.level}
+																		>
+																			{t('HETrigger:sensitivity-option', {
+																				level: preset.level,
+																				percent: preset.actuationPoint,
+																			})}
+																		</option>
+																	))}
+																</Form.Select>
+																{isAnalogAction(profile.actions[channel]) && (
+																	<FormCheck
+																		type="switch"
+																		id={`he-analog-${channel}`}
+																		label={t('HETrigger:analog-switch-label')}
+																		checked={Boolean(
+																			triggers[channel]?.analogProportional,
+																		)}
+																		onChange={() =>
+																			toggleAnalogProportional(channel)
+																		}
+																		className="he-binding-rt"
+																		title={t('HETrigger:analog-switch-title')}
+																	/>
+																)}
 																<FormCheck
 																	type="switch"
 																	id={`he-rapid-${channel}`}

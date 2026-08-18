@@ -907,6 +907,11 @@ message HETriggerInfo
     optional uint32 rtReleaseSensitivity   = 12;
     optional bool   continuousRapidTrigger = 13;
     optional uint32 travelDeadzone         = 14;
+
+    // When the action is an ANALOG_DIRECTION_*, drive the axis proportionally to
+    // how far the switch is pressed rather than slamming it to full deflection.
+    // Ignored for ordinary button actions.
+    optional bool analogProportional = 15;
 }
 
 message HETriggerProfile

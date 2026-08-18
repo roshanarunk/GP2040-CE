@@ -1,49 +1,91 @@
-// Actuation presets, expressed as percentages of the idle -> pressed travel.
+// Sensitivity levels, expressed as percentages of the idle -> pressed travel.
 //
-// The firmware stores only the resolved numbers, never the preset name, so it has
-// a single code path and per-button hand tuning stays first class. The UI infers
-// which preset is active by matching stored values back against this table, and
-// shows "Custom" when nothing matches.
+// The firmware stores only the resolved numbers, never the level, so it has a
+// single code path and per-button hand tuning stays first class. The UI infers
+// which level is active by matching stored values back against this table, and
+// reports "Custom" when nothing matches.
 
 export type HEPreset = {
-	id: string;
+	// 1 = most sensitive, 10 = deepest. A plain number scale rather than names,
+	// so "more sensitive" is unambiguous and comparable at a glance.
+	level: number;
 	actuationPoint: number;
 	rtPressSensitivity: number;
 	rtReleaseSensitivity: number;
 	continuousRapidTrigger: boolean;
 };
 
+// Level 1 sits at 3% travel with 1% rapid trigger deltas -- roughly a hair
+// trigger, and meaningfully quicker than the old most-sensitive setting (8%/3%).
+// The firmware clamps the rapid trigger deltas up to the measured noise floor of
+// each switch, so a level this fine degrades safely on a noisy channel rather
+// than chattering.
 export const HE_PRESETS: HEPreset[] = [
 	{
-		id: 'hairpin',
-		actuationPoint: 8,
+		level: 1,
+		actuationPoint: 3,
+		rtPressSensitivity: 1,
+		rtReleaseSensitivity: 1,
+		continuousRapidTrigger: true,
+	},
+	{
+		level: 2,
+		actuationPoint: 6,
+		rtPressSensitivity: 2,
+		rtReleaseSensitivity: 2,
+		continuousRapidTrigger: true,
+	},
+	{
+		level: 3,
+		actuationPoint: 10,
 		rtPressSensitivity: 3,
 		rtReleaseSensitivity: 3,
 		continuousRapidTrigger: true,
 	},
 	{
-		id: 'light',
+		level: 4,
 		actuationPoint: 15,
 		rtPressSensitivity: 5,
 		rtReleaseSensitivity: 5,
 		continuousRapidTrigger: true,
 	},
 	{
-		id: 'standard',
+		level: 5,
+		actuationPoint: 25,
+		rtPressSensitivity: 7,
+		rtReleaseSensitivity: 7,
+		continuousRapidTrigger: false,
+	},
+	{
+		level: 6,
 		actuationPoint: 35,
 		rtPressSensitivity: 10,
 		rtReleaseSensitivity: 10,
 		continuousRapidTrigger: false,
 	},
 	{
-		id: 'deliberate',
+		level: 7,
+		actuationPoint: 45,
+		rtPressSensitivity: 12,
+		rtReleaseSensitivity: 12,
+		continuousRapidTrigger: false,
+	},
+	{
+		level: 8,
 		actuationPoint: 55,
 		rtPressSensitivity: 15,
 		rtReleaseSensitivity: 15,
 		continuousRapidTrigger: false,
 	},
 	{
-		id: 'heavy',
+		level: 9,
+		actuationPoint: 65,
+		rtPressSensitivity: 18,
+		rtReleaseSensitivity: 18,
+		continuousRapidTrigger: false,
+	},
+	{
+		level: 10,
 		actuationPoint: 75,
 		rtPressSensitivity: 20,
 		rtReleaseSensitivity: 20,
@@ -51,13 +93,15 @@ export const HE_PRESETS: HEPreset[] = [
 	},
 ];
 
-export const DEFAULT_PRESET_ID = 'standard';
+export const DEFAULT_PRESET_LEVEL = 6;
 
-export const getPreset = (id: string): HEPreset =>
-	HE_PRESETS.find((preset) => preset.id === id) ||
-	(HE_PRESETS.find((preset) => preset.id === DEFAULT_PRESET_ID) as HEPreset);
+export const getPreset = (level: number): HEPreset =>
+	HE_PRESETS.find((preset) => preset.level === level) ||
+	(HE_PRESETS.find(
+		(preset) => preset.level === DEFAULT_PRESET_LEVEL,
+	) as HEPreset);
 
-// Returns the preset whose values match, or null when the values were hand tuned.
+// Returns the level whose values match, or null when the values were hand tuned.
 export const matchPreset = (values: {
 	actuationPoint: number;
 	rtPressSensitivity: number;

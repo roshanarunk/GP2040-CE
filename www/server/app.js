@@ -620,7 +620,12 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			is_polarized: false,
 			release: 1500,
 			noise: 50, 
-			rapidTrigger: false
+			rapidTrigger: false,
+			actuationPoint: 35,
+			rtPressSensitivity: 10,
+			rtReleaseSensitivity: 10,
+			continuousRapidTrigger: false,
+			travelDeadzone: 3
 		},
 		{
 			action: 3, 
@@ -630,7 +635,12 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			is_polarized: true,
 			release: 1500,
 			noise: 50, 
-			rapidTrigger: false
+			rapidTrigger: false,
+			actuationPoint: 35,
+			rtPressSensitivity: 10,
+			rtReleaseSensitivity: 10,
+			continuousRapidTrigger: false,
+			travelDeadzone: 3
 		},
 		{
 			action: 4, 
@@ -640,7 +650,12 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			is_polarized: false,
 			release: 2000,
 			noise: 50, 
-			rapidTrigger: true
+			rapidTrigger: true,
+			actuationPoint: 35,
+			rtPressSensitivity: 10,
+			rtReleaseSensitivity: 10,
+			continuousRapidTrigger: false,
+			travelDeadzone: 3
 		},
 		{
 			action: 5, 
@@ -650,7 +665,12 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			is_polarized: true,
 			release: 1500,
 			noise: 50, 
-			rapidTrigger: true
+			rapidTrigger: true,
+			actuationPoint: 35,
+			rtPressSensitivity: 10,
+			rtReleaseSensitivity: 10,
+			continuousRapidTrigger: false,
+			travelDeadzone: 3
 		},
 	);
 	for(var i = 4; i < 32; i++) {
@@ -663,6 +683,11 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			release: 1500,
 			noise: 50,
 			rapidTrigger: false,
+			actuationPoint: 35,
+			rtPressSensitivity: 10,
+			rtReleaseSensitivity: 10,
+			continuousRapidTrigger: false,
+			travelDeadzone: 3,
 		});
 	}
 	return res.send({triggers});

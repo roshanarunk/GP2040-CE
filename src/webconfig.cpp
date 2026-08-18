@@ -1648,7 +1648,13 @@ std::string getHETriggerVoltage()
 
 std::string getHETriggerCalibrations()
 {
-    const size_t capacity = JSON_OBJECT_SIZE(500);
+    // Sized from the actual shape rather than a round number: 32 triggers of 13
+    // fields needs ~4.1KB, which already overflows the old JSON_OBJECT_SIZE(500).
+    // ArduinoJson truncates silently on overflow, so this must not be tight.
+    const size_t capacity = JSON_OBJECT_SIZE(2) +
+                            JSON_ARRAY_SIZE(HETRIGGER_COUNT) +
+                            HETRIGGER_COUNT * JSON_OBJECT_SIZE(14) +
+                            512;
     DynamicJsonDocument doc(capacity);
 
     HETriggerInfo * heTriggers = Storage::getInstance().getAddonOptions().heTriggerOptions.triggers;
@@ -1664,6 +1670,13 @@ std::string getHETriggerCalibrations()
         trigger["release"] = heTriggers[i].release;
         trigger["noise"] = heTriggers[i].noise;
         trigger["rapidTrigger"] = heTriggers[i].rapidTrigger;
+        // Rapid trigger v2. These are what the runtime actually uses; without them
+        // the UI shows stale legacy thresholds and cannot round-trip a save.
+        trigger["actuationPoint"] = heTriggers[i].actuationPoint;
+        trigger["rtPressSensitivity"] = heTriggers[i].rtPressSensitivity;
+        trigger["rtReleaseSensitivity"] = heTriggers[i].rtReleaseSensitivity;
+        trigger["continuousRapidTrigger"] = heTriggers[i].continuousRapidTrigger;
+        trigger["travelDeadzone"] = heTriggers[i].travelDeadzone;
     }
 
     return serialize_json(doc);
@@ -1684,6 +1697,20 @@ std::string setHETriggerCalibrations()
         heTriggers[i].release = doc["triggers"][i]["release"];
         heTriggers[i].noise = doc["triggers"][i]["noise"];
         heTriggers[i].rapidTrigger = doc["triggers"][i]["rapidTrigger"];
+
+        // Rapid trigger v2. Defaulted to the current stored value rather than a
+        // constant, so an older client that does not send these fields leaves them
+        // alone instead of silently resetting a calibrated board.
+        heTriggers[i].actuationPoint =
+            doc["triggers"][i]["actuationPoint"] | heTriggers[i].actuationPoint;
+        heTriggers[i].rtPressSensitivity =
+            doc["triggers"][i]["rtPressSensitivity"] | heTriggers[i].rtPressSensitivity;
+        heTriggers[i].rtReleaseSensitivity =
+            doc["triggers"][i]["rtReleaseSensitivity"] | heTriggers[i].rtReleaseSensitivity;
+        heTriggers[i].continuousRapidTrigger =
+            doc["triggers"][i]["continuousRapidTrigger"] | heTriggers[i].continuousRapidTrigger;
+        heTriggers[i].travelDeadzone =
+            doc["triggers"][i]["travelDeadzone"] | heTriggers[i].travelDeadzone;
     }
 
     Storage::getInstance().getAddonOptions().heTriggerOptions.triggers_count = 32;

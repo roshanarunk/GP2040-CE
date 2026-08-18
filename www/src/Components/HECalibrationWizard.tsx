@@ -66,7 +66,7 @@ const actionLabel = (actionId: number) => {
 
 const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 	const { t } = useTranslation('');
-	const { triggers, fetchHETriggers } = useHETriggerStore();
+	const { triggers, fetchHETriggers, saveHETriggers } = useHETriggerStore();
 
 	const [step, setStep] = useState(STEP_READY);
 	const [status, setStatus] = useState<CalStatus | null>(null);
@@ -157,6 +157,14 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 				heTriggerSmoothing: values['heTriggerSmoothing'],
 				heTriggerSmoothingFactor: values['heTriggerSmoothingFactor'],
 			});
+
+			// Commit the action assignments too. The firmware decides which channels
+			// to sweep by reading the stored bindings, but assigning a button in the
+			// UI only updates the browser store until "Save Trigger Values" is
+			// pressed -- so without this, a newly assigned button is still unset as
+			// far as the sweep is concerned and gets skipped entirely.
+			await saveHETriggers();
+
 			const result = await WebApi.startHECalibration();
 			if (result?.error) {
 				setError(result.error);

@@ -345,11 +345,13 @@ const TriggerActionsForm = ({
 										<tr>
 											<th>{t('HETrigger:channel-label')}</th>
 											<th>{t('HETrigger:voltage-table-idle-text')}</th>
-											<th>{t('HETrigger:voltage-table-trigger-text')}</th>
 											<th>{t('HETrigger:voltage-table-pressed-text')}</th>
+											<th>{t('HETrigger:voltage-table-span-text')}</th>
+											<th>{t('HETrigger:voltage-table-actuation-text')}</th>
 											<th>{t('HETrigger:voltage-table-polarity-text')}</th>
 											<th>{t('HETrigger:voltage-table-rapid-trigger-text')}</th>
-											<th>{t('HETrigger:voltage-table-release-text')}</th>
+											<th>{t('HETrigger:voltage-table-rt-press-text')}</th>
+											<th>{t('HETrigger:voltage-table-rt-release-text')}</th>
 											<th>{t('HETrigger:voltage-table-noise-text')}</th>
 										</tr>
 									</thead>
@@ -360,12 +362,16 @@ const TriggerActionsForm = ({
 										>
 											<td>{index} {triggers[key].action===-10?t('HETrigger:voltage-table-disabled-label'):''}</td>
 											<td>{triggers[key].idle}</td>
-											<td>{triggers[key].active}</td>
 											<td>{triggers[key].pressed}</td>
+											{/* Span is what makes a bad calibration obvious at a glance:
+											    a near-zero span means the channel never really moved. */}
+											<td>{Math.abs(triggers[key].pressed - triggers[key].idle)}</td>
+											<td>{triggers[key].actuationPoint}%</td>
 											<td>{triggers[key].is_polarized ? 'S' : 'N'}</td>
 											<td>{triggers[key].rapidTrigger ? 'Enabled' : 'Disabled'}</td>
-											<td>{triggers[key].rapidTrigger ? triggers[key].release : 'N/A'}</td>
-											<td>{triggers[key].rapidTrigger ? triggers[key].noise : 'N/A'}</td>
+											<td>{triggers[key].rapidTrigger ? `${triggers[key].rtPressSensitivity}%` : 'N/A'}</td>
+											<td>{triggers[key].rapidTrigger ? `${triggers[key].rtReleaseSensitivity}%` : 'N/A'}</td>
+											<td>{triggers[key].noise}</td>
 										</tr>
 									))}
 									</tbody>

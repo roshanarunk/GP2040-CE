@@ -1027,6 +1027,38 @@ let heProfiles = {
 	})),
 };
 
+// --- live test view mock: a slow sine sweep per channel so the bars move ---
+let heMonitoring = false;
+app.post('/api/startHEMonitor', (req, res) => {
+	heMonitoring = true;
+	return res.send({ monitoring: true });
+});
+app.post('/api/stopHEMonitor', (req, res) => {
+	heMonitoring = false;
+	return res.send({ monitoring: false });
+});
+app.post('/api/getHEMonitorStatus', (req, res) => {
+	const now = Date.now() / 1000;
+	const channels = Array.from({ length: 8 }, (_, id) => {
+		const travel = Math.round(
+			500 + 500 * Math.sin(now * 1.5 + id * 0.7),
+		);
+		const actuationPoint = 35;
+		return {
+			id,
+			travel: Math.max(0, Math.min(1000, travel)),
+			active: travel > actuationPoint * 10,
+			rapidTrigger: id % 3 === 0,
+			actuationPoint,
+		};
+	});
+	return res.send({
+		monitoring: heMonitoring,
+		activeProfile: heProfiles.activeProfile,
+		channels,
+	});
+});
+
 app.get('/api/getHETriggerProfiles', (req, res) => {
 	return res.send(heProfiles);
 });

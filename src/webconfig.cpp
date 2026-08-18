@@ -1842,6 +1842,59 @@ std::string applyHECalibration()
 // triggers[].action; profiles 1..3 live in profileSets[0..2].
 // ---------------------------------------------------------------------------
 
+// Live per-channel state for the test view. Runs the real actuation logic, so
+// what the UI shows is what the gamepad would send -- rapid trigger included.
+std::string startHEMonitor()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+    addon->startMonitor();
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["monitoring"] = true;
+    return serialize_json(doc);
+}
+
+std::string stopHEMonitor()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+    addon->stopMonitor();
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(4));
+    doc["monitoring"] = false;
+    return serialize_json(doc);
+}
+
+std::string getHEMonitorStatus()
+{
+    HETriggerAddon* addon = HETriggerAddon::getInstance();
+    if (addon == nullptr) return heCalibrationError("hall effect addon not enabled");
+
+    const size_t capacity = JSON_OBJECT_SIZE(4) +
+                            JSON_ARRAY_SIZE(HETRIGGER_COUNT) +
+                            HETRIGGER_COUNT * JSON_OBJECT_SIZE(6) +
+                            512;
+    DynamicJsonDocument doc(capacity);
+
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+
+    doc["monitoring"] = addon->isMonitoring();
+    doc["activeProfile"] = addon->getActiveProfile();
+
+    JsonArray channels = doc.createNestedArray("channels");
+    for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+        if (!addon->isChannelAssigned(he)) continue;
+        JsonObject channel = channels.createNestedObject();
+        channel["id"] = he;
+        // 0..1000, already polarity-corrected, so the UI can render it directly.
+        channel["travel"] = addon->getChannelTravel(he);
+        channel["active"] = addon->isChannelActive(he);
+        channel["rapidTrigger"] = options.triggers[he].rapidTrigger;
+        channel["actuationPoint"] = options.triggers[he].actuationPoint;
+    }
+
+    return serialize_json(doc);
+}
+
 std::string getHETriggerProfiles()
 {
     // Sized generously on purpose: ArduinoJson truncates silently when it runs out
@@ -2985,6 +3038,9 @@ static const std::pair<const char*, HandlerFuncPtr> handlerFuncs[] =
     { "/api/getHECalibrationStatus", getHECalibrationStatus },
     { "/api/applyHECalibration", applyHECalibration },
     { "/api/getHETriggerProfiles", getHETriggerProfiles },
+    { "/api/startHEMonitor", startHEMonitor },
+    { "/api/stopHEMonitor", stopHEMonitor },
+    { "/api/getHEMonitorStatus", getHEMonitorStatus },
     { "/api/setHETriggerProfiles", setHETriggerProfiles },
     { "/api/setReactiveLEDs", setReactiveLEDs },
     { "/api/getReactiveLEDs", getReactiveLEDs },

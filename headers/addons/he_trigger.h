@@ -943,6 +943,11 @@ enum class HECalMode : uint8_t {
     IDLE_BASELINE = 1,
     PRESS_CAPTURE = 2,
     DONE = 3,
+    // Live monitoring for the test view: samples and runs the normal actuation
+    // logic so the UI can show real travel and trigger state, but produces no
+    // gamepad input. Shares the sweep with calibration since the config-mode loop
+    // has to tick it either way.
+    MONITOR = 4,
 };
 
 // Per-channel accumulators for the calibration sweep.
@@ -1004,6 +1009,12 @@ public:
     void applyCalibration(uint8_t actuationPercent, uint8_t pressPercent,
                           uint8_t releasePercent, bool continuousRT);
     bool isCalibrating() { return calMode != HECalMode::OFF; }
+    void startMonitor();
+    void stopMonitor();
+    bool isMonitoring() { return calMode == HECalMode::MONITOR; }
+    // Live per-channel state for the test view.
+    int16_t getChannelTravel(uint8_t he) { return monitorTravel[he]; }
+    bool isChannelActive(uint8_t he) { return triggerActive[he]; }
     HECalMode getCalibrationMode() { return calMode; }
     uint32_t getCalibrationElapsedMs();
     const HECalChannel& getCalibrationChannel(uint8_t he) { return calData[he]; }
@@ -1064,6 +1075,7 @@ private:
     absolute_time_t profileSaveDeadline = {};
 
     HECalMode calMode = HECalMode::OFF;
+    int16_t monitorTravel[HETRIGGER_COUNT] = {};
     HECalChannel calData[HETRIGGER_COUNT] = {};
     absolute_time_t calPhaseStart = {};
     absolute_time_t calTimeout = {};

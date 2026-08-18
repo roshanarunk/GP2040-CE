@@ -11,6 +11,7 @@ import omit from 'lodash/omit';
 import HECalibration from '../Components/HECalibration';
 import HECalibrationWizard from '../Components/HECalibrationWizard';
 import HEProfileSelector from '../Components/HEProfileSelector';
+import HEMonitor from '../Components/HEMonitor';
 
 import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
 
@@ -33,9 +34,9 @@ import {
 
 // Only provide gamepad inputs for now
 const SELECTABLE_BUTTON_ACTIONS = [
-	-10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-	41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 59, 60, 61, 62,
-	63, 64, 65, 66, 72, 73, 74, 75, 76, 77, 78
+	-10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 41,
+	42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 59, 60, 61, 62, 63, 64,
+	65, 66, 72, 73, 74, 75, 76, 77, 78,
 ];
 
 // HE-local pseudo-actions for switching binding profiles. These live above
@@ -59,12 +60,13 @@ const heProfileActionLabel = (actionId: number) => {
 	return `HE_PROFILE_${actionId - HE_ACTION_PROFILE_1 + 1}`;
 };
 
-
-const isSelectable = (value) =>
-	SELECTABLE_BUTTON_ACTIONS.includes(value);
+const isSelectable = (value) => SELECTABLE_BUTTON_ACTIONS.includes(value);
 
 export const HETriggerScheme = {
-	HETriggerEnabled: yup.number().required().label('Hall Effect Triggers Enabled'),
+	HETriggerEnabled: yup
+		.number()
+		.required()
+		.label('Hall Effect Triggers Enabled'),
 	muxChannels: yup
 		.number()
 		.label('Multiplexer Channels')
@@ -145,12 +147,8 @@ type TriggerActionsFormTypes = {
 	values: typeof DEFAULT_VALUES;
 	errors: FormikErrors<typeof DEFAULT_VALUES>;
 	muxChannels: number;
-	handleChange: (
-		e: Event,
-	) => void;
-	handleCheckbox: (
-		e: Event,
-	) => void;
+	handleChange: (e: Event) => void;
+	handleCheckbox: (e: Event) => void;
 };
 
 const TriggerActionsForm = ({
@@ -159,7 +157,7 @@ const TriggerActionsForm = ({
 	errors,
 	muxChannels,
 	handleChange,
-	handleCheckbox
+	handleCheckbox,
 }: TriggerActionsFormTypes) => {
 	const saveHETriggers = useHETriggerStore((state) => state.saveHETriggers);
 
@@ -209,15 +207,22 @@ const TriggerActionsForm = ({
 				</div>
 				<div className="mt-2 d-flex gap-2 flex-wrap">
 					{/* Guided flow: calibrates every assigned button in one pass. */}
-					<Button type="button"
+					<Button
+						type="button"
 						key={`calibrate-wizard-he`}
 						onClick={() => setShowWizard(true)}
-						disabled={triggers.filter((e)=>{ return e.action !== -10; }).length === 0}
-						className="my-2">
+						disabled={
+							triggers.filter((e) => {
+								return e.action !== -10;
+							}).length === 0
+						}
+						className="my-2"
+					>
 						{t('HETrigger:wizard-button')}
 					</Button>
 					{/* Per-channel flow, kept for hand tuning a single switch. */}
-					<Button type="button"
+					<Button
+						type="button"
 						key={`calibrate-all-he`}
 						variant="secondary"
 						onClick={(e) => {
@@ -225,8 +230,13 @@ const TriggerActionsForm = ({
 							setCalibrationTarget(0);
 							setCalibrateAllLoop(true);
 						}}
-						disabled={triggers.filter((e)=>{ return e.action !== -10; }).length === 0}
-						className="my-2">
+						disabled={
+							triggers.filter((e) => {
+								return e.action !== -10;
+							}).length === 0
+						}
+						className="my-2"
+					>
 						{t('HETrigger:calibrate-all-button')}
 					</Button>
 				</div>
@@ -247,7 +257,12 @@ const TriggerActionsForm = ({
 				<HEProfileSelector
 					options={options}
 					muxChannels={muxChannels}
-					usableChannels={Math.min(4, Math.floor(32 / muxChannels)) * muxChannels}
+					// Only offer channels on multiplexers that actually have an ADC pin
+					// assigned; an unset pin means that board is not connected.
+					connectedMuxes={Array.from(
+						{ length: Math.min(4, Math.floor(32 / muxChannels)) },
+						(_, i) => values[`muxADCPin${i}` as keyof typeof values] as number,
+					)}
 					getOptionLabel={optionLabel}
 					onCalibrateChannel={(channel) => {
 						setCalibrationTarget(channel);
@@ -255,10 +270,23 @@ const TriggerActionsForm = ({
 						setShowModal(true);
 					}}
 				></HEProfileSelector>
+				<HEMonitor
+					muxChannels={muxChannels}
+					actionForChannel={(channel) => triggers[channel]?.action ?? -10}
+				></HEMonitor>
 			</div>
 			<div className="mt-2">
-				<Button type="button" onClick={() => {setShowVoltTable(!showVoltTable)}} className="my-4">
-					{!showVoltTable ? t('HETrigger:voltage-table-show-label') : t('HETrigger:voltage-table-hide-label')} ⚡
+				<Button
+					type="button"
+					onClick={() => {
+						setShowVoltTable(!showVoltTable);
+					}}
+					className="my-4"
+				>
+					{!showVoltTable
+						? t('HETrigger:voltage-table-show-label')
+						: t('HETrigger:voltage-table-hide-label')}{' '}
+					⚡
 				</Button>
 			</div>
 			<div hidden={!showVoltTable} className="mt-2">
@@ -266,58 +294,95 @@ const TriggerActionsForm = ({
 					<h1>{t('HETrigger:voltage-table-header-text')}</h1>
 				</div>
 				<div>
-					{Array.from({ length: Math.min(4,Math.floor(32/muxChannels)) }, (_, i) => (
-						<div
-							key={`voltage-table-header-${i}`} 
-							className="mt-3 mb-3"
-							hidden={values[`muxADCPin${i}` as keyof typeof values] === -1}
-						>
-							<div className="d-flex flex-shrink-0">
-								<label>
-									{muxChannels > 1 ? `${t('HETrigger:multiplexer-label')} ${i}` : 'Direct'} (ADC {String(values[`muxADCPin${i}` as keyof typeof values])})
-								</label>
-							</div>
-							{ (values[`muxADCPin${i}` as keyof typeof values] !== -1) ?
-							<div className={`action-grid-HE-trigger-${muxChannels} gap-0 mt-0 mb-0`}>
-								<Table bordered className="mb-0 mt-0">
-									<thead>
-										<tr>
-											<th>{t('HETrigger:channel-label')}</th>
-											<th>{t('HETrigger:voltage-table-idle-text')}</th>
-											<th>{t('HETrigger:voltage-table-pressed-text')}</th>
-											<th>{t('HETrigger:voltage-table-span-text')}</th>
-											<th>{t('HETrigger:voltage-table-actuation-text')}</th>
-											<th>{t('HETrigger:voltage-table-polarity-text')}</th>
-											<th>{t('HETrigger:voltage-table-rapid-trigger-text')}</th>
-											<th>{t('HETrigger:voltage-table-rt-press-text')}</th>
-											<th>{t('HETrigger:voltage-table-rt-release-text')}</th>
-											<th>{t('HETrigger:voltage-table-noise-text')}</th>
-										</tr>
-									</thead>
-									<tbody>
-									{Object.keys(triggers).splice(i*muxChannels,muxChannels).map((key, index) => (
-										<tr
-											key={`table-tr-triggers-${index}`}
-										>
-											<td>{index} {triggers[key].action===-10?t('HETrigger:voltage-table-disabled-label'):''}</td>
-											<td>{triggers[key].idle}</td>
-											<td>{triggers[key].pressed}</td>
-											{/* Span is what makes a bad calibration obvious at a glance:
+					{Array.from(
+						{ length: Math.min(4, Math.floor(32 / muxChannels)) },
+						(_, i) => (
+							<div
+								key={`voltage-table-header-${i}`}
+								className="mt-3 mb-3"
+								hidden={values[`muxADCPin${i}` as keyof typeof values] === -1}
+							>
+								<div className="d-flex flex-shrink-0">
+									<label>
+										{muxChannels > 1
+											? `${t('HETrigger:multiplexer-label')} ${i}`
+											: 'Direct'}{' '}
+										(ADC{' '}
+										{String(values[`muxADCPin${i}` as keyof typeof values])})
+									</label>
+								</div>
+								{values[`muxADCPin${i}` as keyof typeof values] !== -1 ? (
+									<div
+										className={`action-grid-HE-trigger-${muxChannels} gap-0 mt-0 mb-0`}
+									>
+										<Table bordered className="mb-0 mt-0">
+											<thead>
+												<tr>
+													<th>{t('HETrigger:channel-label')}</th>
+													<th>{t('HETrigger:voltage-table-idle-text')}</th>
+													<th>{t('HETrigger:voltage-table-pressed-text')}</th>
+													<th>{t('HETrigger:voltage-table-span-text')}</th>
+													<th>{t('HETrigger:voltage-table-actuation-text')}</th>
+													<th>{t('HETrigger:voltage-table-polarity-text')}</th>
+													<th>
+														{t('HETrigger:voltage-table-rapid-trigger-text')}
+													</th>
+													<th>{t('HETrigger:voltage-table-rt-press-text')}</th>
+													<th>
+														{t('HETrigger:voltage-table-rt-release-text')}
+													</th>
+													<th>{t('HETrigger:voltage-table-noise-text')}</th>
+												</tr>
+											</thead>
+											<tbody>
+												{Object.keys(triggers)
+													.splice(i * muxChannels, muxChannels)
+													.map((key, index) => (
+														<tr key={`table-tr-triggers-${index}`}>
+															<td>
+																{index}{' '}
+																{triggers[key].action === -10
+																	? t('HETrigger:voltage-table-disabled-label')
+																	: ''}
+															</td>
+															<td>{triggers[key].idle}</td>
+															<td>{triggers[key].pressed}</td>
+															{/* Span is what makes a bad calibration obvious at a glance:
 											    a near-zero span means the channel never really moved. */}
-											<td>{Math.abs(triggers[key].pressed - triggers[key].idle)}</td>
-											<td>{triggers[key].actuationPoint}%</td>
-											<td>{triggers[key].is_polarized ? 'S' : 'N'}</td>
-											<td>{triggers[key].rapidTrigger ? 'Enabled' : 'Disabled'}</td>
-											<td>{triggers[key].rapidTrigger ? `${triggers[key].rtPressSensitivity}%` : 'N/A'}</td>
-											<td>{triggers[key].rapidTrigger ? `${triggers[key].rtReleaseSensitivity}%` : 'N/A'}</td>
-											<td>{triggers[key].noise}</td>
-										</tr>
-									))}
-									</tbody>
-								</Table>
-							</div> : '' }
-						</div>
-					))}
+															<td>
+																{Math.abs(
+																	triggers[key].pressed - triggers[key].idle,
+																)}
+															</td>
+															<td>{triggers[key].actuationPoint}%</td>
+															<td>{triggers[key].is_polarized ? 'S' : 'N'}</td>
+															<td>
+																{triggers[key].rapidTrigger
+																	? 'Enabled'
+																	: 'Disabled'}
+															</td>
+															<td>
+																{triggers[key].rapidTrigger
+																	? `${triggers[key].rtPressSensitivity}%`
+																	: 'N/A'}
+															</td>
+															<td>
+																{triggers[key].rapidTrigger
+																	? `${triggers[key].rtReleaseSensitivity}%`
+																	: 'N/A'}
+															</td>
+															<td>{triggers[key].noise}</td>
+														</tr>
+													))}
+											</tbody>
+										</Table>
+									</div>
+								) : (
+									''
+								)}
+							</div>
+						),
+					)}
 				</div>
 			</div>
 			<div className="mt-2">
@@ -330,7 +395,12 @@ const TriggerActionsForm = ({
 	);
 };
 
-const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTypes) => {
+const HETrigger = ({
+	values,
+	errors,
+	handleChange,
+	handleCheckbox,
+}: AddonPropTypes) => {
 	const { fetchHETriggers, triggers } = useHETriggerStore();
 	const { t } = useTranslation();
 
@@ -351,20 +421,18 @@ const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTy
 	}, []);
 
 	return (
-		<Section title={
-			<a
-				href="https://gp2040-ce.info/add-ons/he-trigger"
-				target="_blank"
-				className="text-reset text-decoration-none"
-			>
-				{t('HETrigger:header-text')}
-			</a>
+		<Section
+			title={
+				<a
+					href="https://gp2040-ce.info/add-ons/he-trigger"
+					target="_blank"
+					className="text-reset text-decoration-none"
+				>
+					{t('HETrigger:header-text')}
+				</a>
 			}
 		>
-			<div
-				id="HETriggerOptions"
-				hidden={!(values.HETriggerEnabled)}
-			>
+			<div id="HETriggerOptions" hidden={!values.HETriggerEnabled}>
 				<div className="alert alert-info" role="alert">
 					{t('HETrigger:desc-header-text')}
 				</div>
@@ -452,7 +520,7 @@ const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTy
 				<Row className="mb-3">
 					<FormSelect
 						label={t('HETrigger:adc-pin-0')}
-						name='muxADCPin0'
+						name="muxADCPin0"
 						className="form-select-sm"
 						groupClassName="col-sm-2 mb-3"
 						value={values.muxADCPin0}
@@ -464,7 +532,7 @@ const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTy
 					</FormSelect>
 					<FormSelect
 						label={t('HETrigger:adc-pin-1')}
-						name='muxADCPin1'
+						name="muxADCPin1"
 						className="form-select-sm"
 						groupClassName="col-sm-2 mb-3"
 						value={values.muxADCPin1}
@@ -476,7 +544,7 @@ const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTy
 					</FormSelect>
 					<FormSelect
 						label={t('HETrigger:adc-pin-2')}
-						name='muxADCPin2'
+						name="muxADCPin2"
 						hidden={values.muxChannels >= 16}
 						className="form-select-sm"
 						groupClassName="col-sm-2 mb-3"
@@ -489,7 +557,7 @@ const HETrigger = ({ values, errors, handleChange, handleCheckbox }: AddonPropTy
 					</FormSelect>
 					<FormSelect
 						label={t('HETrigger:adc-pin-3')}
-						name='muxADCPin3'
+						name="muxADCPin3"
 						hidden={values.muxChannels >= 8}
 						className="form-select-sm"
 						groupClassName="col-sm-2 mb-3"

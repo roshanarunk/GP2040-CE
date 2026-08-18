@@ -13,8 +13,9 @@ type Option = { label: string; value: number };
 type Props = {
 	options: Option[];
 	muxChannels: number;
-	// Channels beyond this are not addressable with the current mux config.
-	usableChannels: number;
+	// ADC pin per multiplexer, in board order. An entry of -1 means that
+	// multiplexer has no pin assigned and is therefore not connected.
+	connectedMuxes: number[];
 	getOptionLabel: (option: Option) => string;
 	// Opens the single-channel calibration modal for a given channel.
 	onCalibrateChannel: (channel: number) => void;
@@ -26,7 +27,7 @@ type Props = {
 const HEProfileSelector = ({
 	options,
 	muxChannels,
-	usableChannels,
+	connectedMuxes,
 	getOptionLabel,
 	onCalibrateChannel,
 }: Props) => {
@@ -138,69 +139,98 @@ const HEProfileSelector = ({
 								</div>
 							)}
 
-							<div className="he-binding-grid">
-								{Array.from({ length: usableChannels }, (_, channel) => (
+							{connectedMuxes.map((adcPin, muxIndex) =>
+								adcPin === -1 ? null : (
 									<div
-										key={`he-profile-${profileIndex}-ch-${channel}`}
-										className="he-binding-row"
+										key={`he-profile-${profileIndex}-mux-${muxIndex}`}
+										className="mb-3"
 									>
-										<div className="he-binding-label">
-											{channelLabel(channel)}
+										<div className="he-binding-mux-label">
+											{muxChannels > 1
+												? t('HETrigger:mux-group-label', {
+														index: muxIndex,
+														pin: adcPin,
+													})
+												: t('HETrigger:direct-group-label', { pin: adcPin })}
 										</div>
-										<div className="he-binding-select">
-											<CustomSelect
-												inputId={`he-profile-${profileIndex}-select-${channel}`}
-												isClearable
-												isSearchable
-												options={options}
-												getOptionLabel={getOptionLabel}
-												value={
-													options.find(
-														(option) => option.value === profile.actions[channel],
-													) || null
-												}
-												onChange={(change) =>
-													setProfileAction(
-														profileIndex,
-														channel,
-														change?.value === undefined ? -10 : change.value,
-													)
-												}
-											/>
-										</div>
-										{/* Rapid trigger and calibration are per switch, not per
+										<div className="he-binding-grid">
+											{Array.from({ length: muxChannels }, (_, offset) => {
+												const channel = muxIndex * muxChannels + offset;
+												return (
+													<div
+														key={`he-profile-${profileIndex}-ch-${channel}`}
+														className="he-binding-row"
+													>
+														<div className="he-binding-label">
+															{channelLabel(channel)}
+														</div>
+														<div className="he-binding-select">
+															<CustomSelect
+																inputId={`he-profile-${profileIndex}-select-${channel}`}
+																isClearable
+																isSearchable
+																options={options}
+																getOptionLabel={getOptionLabel}
+																value={
+																	options.find(
+																		(option) =>
+																			option.value === profile.actions[channel],
+																	) || null
+																}
+																onChange={(change) =>
+																	setProfileAction(
+																		profileIndex,
+																		channel,
+																		change?.value === undefined
+																			? -10
+																			: change.value,
+																	)
+																}
+															/>
+														</div>
+														{/* Rapid trigger and calibration are per switch, not per
 										    profile, so they are only offered on the base tab. */}
-										{profileIndex === 0 && (
-											<>
-												<FormCheck
-													type="switch"
-													id={`he-rapid-${channel}`}
-													label={t('HETrigger:rapid-trigger-switch-label')}
-													checked={Boolean(triggers[channel]?.rapidTrigger)}
-													disabled={!isCalibrated(channel)}
-													onChange={() => toggleRapidTrigger(channel)}
-													className="he-binding-rt"
-													title={
-														isCalibrated(channel)
-															? undefined
-															: t('HETrigger:rapid-trigger-needs-calibration')
-													}
-												/>
-												<Button
-													type="button"
-													size="sm"
-													variant="outline-secondary"
-													onClick={() => onCalibrateChannel(channel)}
-													disabled={profile.actions[channel] === -10}
-													title={t('HETrigger:calibrate-single-title')}
-												>
-													🧲
-												</Button>
-											</>
-										)}
+														{profileIndex === 0 && (
+															<>
+																<FormCheck
+																	type="switch"
+																	id={`he-rapid-${channel}`}
+																	label={t(
+																		'HETrigger:rapid-trigger-switch-label',
+																	)}
+																	checked={Boolean(
+																		triggers[channel]?.rapidTrigger,
+																	)}
+																	disabled={!isCalibrated(channel)}
+																	onChange={() => toggleRapidTrigger(channel)}
+																	className="he-binding-rt"
+																	title={
+																		isCalibrated(channel)
+																			? undefined
+																			: t(
+																					'HETrigger:rapid-trigger-needs-calibration',
+																				)
+																	}
+																/>
+																<Button
+																	type="button"
+																	size="sm"
+																	variant="outline-secondary"
+																	onClick={() => onCalibrateChannel(channel)}
+																	disabled={profile.actions[channel] === -10}
+																	title={t('HETrigger:calibrate-single-title')}
+																>
+																	🧲
+																</Button>
+															</>
+														)}
+													</div>
+												);
+											})}
+										</div>
 									</div>
-								))}
-							</div>
+								),
+							)}
 						</Tab.Pane>
 					))}
 				</Tab.Content>

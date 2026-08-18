@@ -107,6 +107,18 @@ export default {
 	'preset-heavy': 'Heavy',
 	'preset-heavy-desc': 'Deepest actuation. Best for noisy rigs or a heavy hand.',
 
+	// Live test view
+	'monitor-header': 'Test Your Switches',
+	'monitor-intro':
+		'Press buttons to see how deep each switch is pressed and whether it is currently ' +
+		'sending its action. Gamepad output is paused while this is running.',
+	'monitor-start': 'Start Testing',
+	'monitor-stop': 'Stop Testing',
+	'monitor-legend-active': 'Sending input',
+	'monitor-legend-idle': 'Pressed, not actuated',
+	'monitor-legend-rt': 'Rapid trigger enabled',
+	'monitor-none-assigned': 'No buttons are assigned yet, so there is nothing to test.',
+
 	// Binding profiles
 	'profiles-header': 'Hall-Effect Binding Profiles',
 	'profiles-shared-tuning-note':
@@ -125,6 +137,8 @@ export default {
 	'profile-disabled-warning':
 		'This profile is disabled, so the cycle button will skip over it. Enable it to include ' +
 		'it when cycling.',
+	'mux-group-label': 'Multiplexer {{index}} (ADC {{pin}})',
+	'direct-group-label': 'Direct (ADC {{pin}})',
 	'rapid-trigger-switch-label': 'RT',
 	'rapid-trigger-needs-calibration':
 		'Calibrate this switch before enabling rapid trigger.',

@@ -486,6 +486,29 @@ void HETriggerAddon::advanceCalibration() {
     calTimeout = make_timeout_time_ms(HETRIGGER_CAL_TIMEOUT_MS);
 }
 
+void HETriggerAddon::startMonitor() {
+    // Reuse the calibration plumbing: the config-mode loop already ticks the
+    // sweep, and monitoring needs the same per-channel sampling. Geometry is
+    // rebuilt so the travel shown matches the currently stored calibration.
+    rebuildGeometry();
+    for(uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+        triggerActive[he] = false;
+        rtArmed[he] = false;
+        monitorTravel[he] = 0;
+    }
+    calMode = HECalMode::MONITOR;
+    calTimeout = make_timeout_time_ms(HETRIGGER_CAL_TIMEOUT_MS);
+}
+
+void HETriggerAddon::stopMonitor() {
+    if (calMode != HECalMode::MONITOR) return;
+    calMode = HECalMode::OFF;
+    for(uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+        triggerActive[he] = false;
+        rtArmed[he] = false;
+    }
+}
+
 void HETriggerAddon::finishCalibration() {
     if (calMode == HECalMode::PRESS_CAPTURE) calMode = HECalMode::DONE;
 }
@@ -625,6 +648,39 @@ void HETriggerAddon::runCalibrationSweep() {
     }
 
     if (calMode == HECalMode::DONE) return;
+
+    // Monitoring runs the real actuation logic so the test view shows exactly
+    // what the gamepad would do, including rapid trigger, without emitting input.
+    if (calMode == HECalMode::MONITOR) {
+        HETriggerOptions & monitorOptions =
+            Storage::getInstance().getAddonOptions().heTriggerOptions;
+        for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
+            if (!isChannelAssigned(he)) continue;
+
+            const uint32_t channel  = (monitorOptions.muxChannels <= 1) ? 0 : (he % monitorOptions.muxChannels);
+            const uint32_t adcIndex = (monitorOptions.muxChannels <= 1) ? he : (he / monitorOptions.muxChannels);
+            if (adcIndex >= 4) continue;
+            if (muxPinArray[adcIndex] < 26 || muxPinArray[adcIndex] > 29) continue;
+
+            if (monitorOptions.muxChannels > 1) selectChannel(channel);
+            if (lastADCSelected != muxPinArray[adcIndex]) {
+                adc_select_input(muxPinArray[adcIndex] - 26);
+                lastADCSelected = muxPinArray[adcIndex];
+            }
+            busy_wait_us_32(HETRIGGER_SETTLE_US);
+
+            uint16_t value = adc_read();
+            if (monitorOptions.emaSmoothing == 1) {
+                value = emaSmoothing(value, emaSmoothingReads[he]);
+                emaSmoothingReads[he] = value;
+            }
+
+            const int16_t travel = toTravel(he, value);
+            monitorTravel[he] = travel;
+            updateTrigger(he, travel);
+        }
+        return;
+    }
 
     for (uint8_t he = 0; he < HETRIGGER_COUNT; he++) {
         if (!isChannelAssigned(he)) continue;

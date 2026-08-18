@@ -711,6 +711,22 @@ async function getHETriggerProfiles() {
 	}
 }
 
+// --- live test view ---
+async function startHEMonitor() {
+	const response = await Http.post(`${baseUrl}/api/startHEMonitor`, {});
+	return response.data;
+}
+
+async function stopHEMonitor() {
+	const response = await Http.post(`${baseUrl}/api/stopHEMonitor`, {});
+	return response.data;
+}
+
+async function getHEMonitorStatus() {
+	const response = await Http.post(`${baseUrl}/api/getHEMonitorStatus`, {});
+	return response.data;
+}
+
 async function setHETriggerProfiles(profiles) {
 	return Http.post(`${baseUrl}/api/setHETriggerProfiles`, profiles);
 }
@@ -786,6 +802,9 @@ export default {
 	applyHECalibration,
 	getHETriggerProfiles,
 	setHETriggerProfiles,
+	startHEMonitor,
+	stopHEMonitor,
+	getHEMonitorStatus,
 	getReactiveLEDs,
 	setReactiveLEDs,
 	getButtonLayouts,

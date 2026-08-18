@@ -116,3 +116,108 @@
 	white-space: nowrap;
 	font-size: 0.85rem;
 }
+.he-binding-mux-label {
+	font-weight: 600;
+	opacity: 0.85;
+	margin-bottom: 0.35rem;
+}
+
+// Live test view: a vertical depth bar per switch, green while the button is
+// actually sending its action and amber while it is pressed but not actuated.
+.he-monitor-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+	gap: 0.75rem;
+}
+
+.he-monitor-tile {
+	border: 1px solid rgba(128, 128, 128, 0.4);
+	border-radius: 0.375rem;
+	padding: 0.5rem;
+	text-align: center;
+	transition: border-color 0.08s linear, background-color 0.08s linear;
+
+	&.active {
+		border-color: #2fbf6b;
+		background-color: rgba(47, 191, 107, 0.12);
+	}
+}
+
+.he-monitor-head {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	font-weight: 600;
+	font-size: 0.85rem;
+}
+
+.he-monitor-rt {
+	font-size: 0.8rem;
+	line-height: 1;
+}
+
+.he-monitor-bar {
+	position: relative;
+	height: 6rem;
+	margin: 0.4rem auto;
+	width: 1.75rem;
+	border-radius: 0.25rem;
+	background-color: rgba(128, 128, 128, 0.22);
+	overflow: hidden;
+}
+
+.he-monitor-fill {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	// Amber while travelling, green once the action is actually firing.
+	background-color: #d8a219;
+	transition: height 0.08s linear, background-color 0.08s linear;
+
+	&.active {
+		background-color: #2fbf6b;
+	}
+}
+
+// Actuation point marker, so it is obvious where the switch should fire.
+.he-monitor-actuation {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background-color: rgba(255, 255, 255, 0.75);
+}
+
+.he-monitor-meta {
+	font-size: 0.7rem;
+	opacity: 0.7;
+	font-variant-numeric: tabular-nums;
+}
+
+.he-monitor-depth {
+	font-size: 0.8rem;
+	opacity: 0.9;
+}
+
+.he-monitor-legend {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.8rem;
+	opacity: 0.85;
+	flex-wrap: wrap;
+}
+
+.he-legend-swatch {
+	display: inline-block;
+	width: 0.8rem;
+	height: 0.8rem;
+	border-radius: 0.15rem;
+	margin-left: 0.6rem;
+}
+
+.he-legend-active { background-color: #2fbf6b; }
+.he-legend-idle { background-color: #d8a219; }
+.he-legend-rt { margin-left: 0.6rem; }

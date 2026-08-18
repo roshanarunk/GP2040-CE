@@ -5,7 +5,6 @@ import { FormikErrors } from 'formik';
 
 import { useTranslation } from 'react-i18next';
 import * as yup from 'yup';
-import invert from 'lodash/invert';
 import omit from 'lodash/omit';
 
 import HECalibration from '../Components/HECalibration';
@@ -128,19 +127,29 @@ export const HETriggerState = {
 	heTriggerSmoothingFactor: 5,
 };
 
-const options = [
-	...Object.entries(BUTTON_ACTIONS)
-		.filter(([, value]) => isSelectable(value))
-		.map(([key, value]) => ({
-			label: key,
-			value,
-		})),
-	// Profile switching is offered on hall effect channels only.
-	...HE_PROFILE_ACTIONS.map((value) => ({
-		label: heProfileActionLabel(value),
-		value: value as PinActionValues,
-	})),
-];
+// Grouped so the analog stick directions are findable: the flat list ran to
+// ~50 entries and buried them among the button presses.
+const ANALOG_ACTION_MIN = 59;
+const ANALOG_ACTION_MAX = 66;
+
+const buttonOptions = Object.entries(BUTTON_ACTIONS)
+	.filter(
+		([, value]) =>
+			isSelectable(value) &&
+			!(value >= ANALOG_ACTION_MIN && value <= ANALOG_ACTION_MAX),
+	)
+	.map(([key, value]) => ({ label: key, value }));
+
+const analogOptions = Object.entries(BUTTON_ACTIONS)
+	.filter(
+		([, value]) => value >= ANALOG_ACTION_MIN && value <= ANALOG_ACTION_MAX,
+	)
+	.map(([key, value]) => ({ label: key, value }));
+
+const profileOptions = HE_PROFILE_ACTIONS.map((value) => ({
+	label: heProfileActionLabel(value),
+	value: value as PinActionValues,
+}));
 
 type TriggerActionsFormTypes = {
 	triggers: Trigger[];
@@ -176,6 +185,13 @@ const TriggerActionsForm = ({
 	// Shared by the base grid and the per-profile grids. The HE profile
 	// pseudo-actions have no PinMapping translation key, so they are resolved
 	// against the HETrigger namespace instead.
+	// react-select renders these as labelled groups.
+	const groupedOptions = [
+		{ label: t('HETrigger:option-group-buttons'), options: buttonOptions },
+		{ label: t('HETrigger:option-group-analog'), options: analogOptions },
+		{ label: t('HETrigger:option-group-profiles'), options: profileOptions },
+	];
+
 	const optionLabel = (option: { label: string; value: number }) => {
 		if (HE_PROFILE_ACTIONS.includes(option.value)) {
 			return t(`HETrigger:action-${option.label.toLowerCase()}`);
@@ -255,7 +271,7 @@ const TriggerActionsForm = ({
 					setShowModal={setShowWizard}
 				></HECalibrationWizard>
 				<HEProfileSelector
-					options={options}
+					options={groupedOptions}
 					muxChannels={muxChannels}
 					// Only offer channels on multiplexers that actually have an ADC pin
 					// assigned; an unset pin means that board is not connected.

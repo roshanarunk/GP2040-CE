@@ -10,9 +10,10 @@ import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
 import { HE_PRESETS, getPreset, matchPreset } from '../Data/HEPresets';
 
 type Option = { label: string; value: number };
+type OptionGroup = { label: string; options: Option[] };
 
 type Props = {
-	options: Option[];
+	options: OptionGroup[];
 	muxChannels: number;
 	// ADC pin per multiplexer, in board order. An entry of -1 means that
 	// multiplexer has no pin assigned and is therefore not connected.
@@ -66,6 +67,15 @@ const HEProfileSelector = ({
 			)} · ${t('HETrigger:channel-label')} ${channel % muxChannels}`;
 		}
 		return `${t('HETrigger:channel-label')} ${channel}`;
+	};
+
+	// Options arrive grouped, so a plain find() no longer works.
+	const findOption = (value: number) => {
+		for (const group of options) {
+			const match = group.options.find((option) => option.value === value);
+			if (match) return match;
+		}
+		return null;
 	};
 
 	const toggleRapidTrigger = (channel: number) => {
@@ -200,37 +210,34 @@ const HEProfileSelector = ({
 														key={`he-profile-${profileIndex}-ch-${channel}`}
 														className="he-binding-row"
 													>
-														<div className="he-binding-label">
-															{channelLabel(channel)}
-														</div>
-														<div className="he-binding-select">
-															<CustomSelect
-																inputId={`he-profile-${profileIndex}-select-${channel}`}
-																isClearable
-																isSearchable
-																options={options}
-																getOptionLabel={getOptionLabel}
-																value={
-																	options.find(
-																		(option) =>
-																			option.value === profile.actions[channel],
-																	) || null
-																}
-																onChange={(change) =>
-																	setProfileAction(
-																		profileIndex,
-																		channel,
-																		change?.value === undefined
-																			? -10
-																			: change.value,
-																	)
-																}
-															/>
+														<div className="he-binding-main">
+															<div className="he-binding-label">
+																{channelLabel(channel)}
+															</div>
+															<div className="he-binding-select">
+																<CustomSelect
+																	inputId={`he-profile-${profileIndex}-select-${channel}`}
+																	isClearable
+																	isSearchable
+																	options={options}
+																	getOptionLabel={getOptionLabel}
+																	value={findOption(profile.actions[channel])}
+																	onChange={(change) =>
+																		setProfileAction(
+																			profileIndex,
+																			channel,
+																			change?.value === undefined
+																				? -10
+																				: change.value,
+																		)
+																	}
+																/>
+															</div>
 														</div>
 														{/* Rapid trigger and calibration are per switch, not per
 										    profile, so they are only offered on the base tab. */}
 														{profileIndex === 0 && (
-															<>
+															<div className="he-binding-controls">
 																{/* Per-switch sensitivity: applies a level's worth of actuation
 																    and rapid trigger values at once. */}
 																<Form.Select
@@ -308,7 +315,7 @@ const HEProfileSelector = ({
 																>
 																	🧲
 																</Button>
-															</>
+															</div>
 														)}
 													</div>
 												);

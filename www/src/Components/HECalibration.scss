@@ -91,14 +91,35 @@
 // base profile also the per-switch rapid trigger toggle and calibrate button.
 .he-binding-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
-	gap: 0.5rem 1.5rem;
+	grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+	gap: 0.75rem 1.5rem;
 }
 
 .he-binding-row {
 	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	min-width: 0;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+// Binding line: channel label plus the action select.
+.he-binding-main {
+	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+	min-width: 0;
+}
+
+// Per-switch controls, indented under the binding they belong to.
+.he-binding-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+	padding-left: 11.5rem;
+	min-width: 0;
 }
 
 .he-binding-label {
@@ -108,7 +129,7 @@
 
 .he-binding-select {
 	flex: 1 1 auto;
-	min-width: 9rem;
+	min-width: 0;
 }
 
 .he-binding-rt {

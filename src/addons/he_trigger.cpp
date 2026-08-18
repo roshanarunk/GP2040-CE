@@ -197,9 +197,15 @@ void HETriggerAddon::selectChannel(uint8_t channel) {
 }
 
 uint16_t HETriggerAddon::emaSmoothing(uint16_t value, uint16_t previous) {
-    float ema_value = (float)value / ADC_MAX;
-    float ema_previous = (float)previous / ADC_MAX;
-    return ((emaSmoothingFactor*ema_value) + ((1.0f-emaSmoothingFactor) * ema_previous)) * ADC_MAX;
+    // Rounded, and without the normalize-to-0..1-then-rescale round trip the
+    // previous version used. That round trip truncated on every iteration, so the
+    // filter settled short of a held reading and never recovered: at the default
+    // smoothing factor a fully pressed switch converged about 19 counts below its
+    // calibrated maximum, which is ~2% of a typical travel span permanently
+    // missing from the top -- enough to stop an analog binding reaching the rail.
+    const float smoothed = (emaSmoothingFactor * (float)value) +
+                           ((1.0f - emaSmoothingFactor) * (float)previous);
+    return (uint16_t)(smoothed + 0.5f);
 }
 
 // Resolve a channel's binding under the currently active HE profile, falling
@@ -669,7 +675,8 @@ void HETriggerAddon::runCalibrationSweep() {
             }
             busy_wait_us_32(HETRIGGER_SETTLE_US);
 
-            uint16_t value = adc_read();
+            const uint16_t rawValue = adc_read();
+            uint16_t value = rawValue;
             if (monitorOptions.emaSmoothing == 1) {
                 value = emaSmoothing(value, emaSmoothingReads[he]);
                 emaSmoothingReads[he] = value;
@@ -677,6 +684,7 @@ void HETriggerAddon::runCalibrationSweep() {
 
             const int16_t travel = toTravel(he, value);
             lastTravel[he] = travel;
+            lastRawTravel[he] = toTravel(he, rawValue);
             updateTrigger(he, travel);
         }
         return;
@@ -750,7 +758,8 @@ void HETriggerAddon::preprocess() {
 
         busy_wait_us_32(HETRIGGER_SETTLE_US);
 
-        uint16_t value = adc_read();
+        const uint16_t rawValue = adc_read();
+        uint16_t value = rawValue;
 
         // Smoothing runs in raw ADC space, before the travel conversion, so that
         // the filter state and the reading it filters are always in the same units.
@@ -761,6 +770,7 @@ void HETriggerAddon::preprocess() {
 
         const int16_t travel = toTravel(he, value);
         lastTravel[he] = travel;
+        lastRawTravel[he] = toTravel(he, rawValue);
 
         updateTrigger(he, travel);
 
@@ -795,7 +805,7 @@ void HETriggerAddon::preprocess() {
 // switch would have registered as pressed; past that it ramps to full over the
 // remaining travel.
 uint16_t HETriggerAddon::analogDeflection(uint8_t he, bool positive) {
-    const int16_t travel = lastTravel[he];
+    const int16_t travel = lastRawTravel[he];
     const int16_t actuation = actuationTravel[he];
 
     // Full deflection is reached slightly before the bottom of travel. `pressed`

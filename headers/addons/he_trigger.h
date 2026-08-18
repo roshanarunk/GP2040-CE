@@ -1087,6 +1087,12 @@ private:
     // in both the gamepad and monitor paths: the test view reports it, and
     // proportional analog output scales the axis by it.
     int16_t lastTravel[HETRIGGER_COUNT] = {};
+    // Travel from the unsmoothed reading. The EMA exists to keep the trigger
+    // state stable, but it is a lag filter: at the default smoothing factor it
+    // needs ~70 samples to settle, so an axis driven from the smoothed value
+    // trails the finger and a brisk press never reaches the rail. Proportional
+    // analog output uses this instead.
+    int16_t lastRawTravel[HETRIGGER_COUNT] = {};
     HECalChannel calData[HETRIGGER_COUNT] = {};
     absolute_time_t calPhaseStart = {};
     absolute_time_t calTimeout = {};

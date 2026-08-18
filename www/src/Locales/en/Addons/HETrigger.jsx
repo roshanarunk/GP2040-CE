@@ -111,13 +111,24 @@ export default {
 	'profiles-header': 'Hall-Effect Binding Profiles',
 	'profiles-shared-tuning-note':
 		'Profiles change which action each button sends. Calibration, actuation points and ' +
-		'rapid trigger settings are shared across all profiles.',
+		'rapid trigger settings are per switch and shared across all profiles. A button left ' +
+		'unassigned in a profile sends nothing while that profile is active.',
 	'profile-base-label': 'Base',
 	'profile-label': 'Profile {{number}}',
 	'profile-enabled-label': 'Enabled (included when cycling profiles)',
 	'profile-base-note':
-		'The base profile is always enabled and is used as the fallback for any button left ' +
-		'unassigned in another profile.',
+		'The base profile is always enabled. Rapid trigger and calibration are per switch, ' +
+		'so they are set here and apply to every profile.',
+	'profile-unbound-note':
+		'Leaving a button unassigned in this profile means it sends nothing while the profile ' +
+		'is active.',
+	'profile-disabled-warning':
+		'This profile is disabled, so the cycle button will skip over it. Enable it to include ' +
+		'it when cycling.',
+	'rapid-trigger-switch-label': 'RT',
+	'rapid-trigger-needs-calibration':
+		'Calibrate this switch before enabling rapid trigger.',
+	'calibrate-single-title': 'Calibrate this switch',
 	'profiles-save-button': 'Save Binding Profiles',
 	'action-he_profile_cycle': 'Cycle HE Profile',
 	'action-he_profile_1': 'Select HE Profile 1',

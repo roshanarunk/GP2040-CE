@@ -211,8 +211,13 @@ int32_t HETriggerAddon::actionFor(uint8_t he) {
     if (activeProfile == 0) return baseAction;
 
     const uint8_t index = activeProfile - 1;
+    // Fall back to the base bindings only when the profile has no data at all --
+    // an unpopulated slot, not a deliberate choice. Once a profile is populated,
+    // an unassigned channel means exactly that: leaving a button unbound in one
+    // profile is a legitimate thing to want, so NONE is returned as-is.
     if (index >= options.profileSets_count) return baseAction;
-    if (he >= options.profileSets[index].actions_count) return baseAction;
+    if (options.profileSets[index].actions_count == 0) return baseAction;
+    if (he >= options.profileSets[index].actions_count) return GpioAction::NONE;
 
     return options.profileSets[index].actions[he];
 }

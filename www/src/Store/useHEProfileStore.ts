@@ -74,7 +74,11 @@ const useHEProfileStore = create<State & Actions>()((set, get) => ({
 				if (index !== profileIndex) return profile;
 				const actions = [...profile.actions];
 				actions[channel] = action;
-				return { ...profile, actions };
+				// Editing a profile enables it. Cycling skips disabled profiles, so a
+				// profile that was configured but never explicitly switched on is
+				// invisible at runtime -- which reads as "profile switching is
+				// broken" rather than "this profile is off".
+				return { ...profile, actions, enabled: true };
 			});
 			return { ...state, profiles };
 		});

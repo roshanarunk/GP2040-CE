@@ -19,7 +19,6 @@ import Section from '../Components/Section';
 import FormSelect from '../Components/FormSelect';
 import FormControl from '../Components/FormControl';
 import { ANALOG_PINS } from '../Data/Buttons';
-import CustomSelect from '../Components/CustomSelect';
 import AnalogPinOptions from '../Components/AnalogPinOptions';
 import { getButtonLabels } from '../Data/Buttons';
 import { AddonPropTypes, DEFAULT_VALUES } from '../Pages/AddonsConfigPage';
@@ -60,15 +59,6 @@ const heProfileActionLabel = (actionId: number) => {
 	return `HE_PROFILE_${actionId - HE_ACTION_PROFILE_1 + 1}`;
 };
 
-const getOption = (e, actionId) => {
-	if (HE_PROFILE_ACTIONS.includes(actionId)) {
-		return { label: heProfileActionLabel(actionId), value: actionId };
-	}
-	return {
-		label: invert(BUTTON_ACTIONS)[actionId],
-		value: actionId,
-	};
-};
 
 const isSelectable = (value) =>
 	SELECTABLE_BUTTON_ACTIONS.includes(value);
@@ -171,7 +161,6 @@ const TriggerActionsForm = ({
 	handleChange,
 	handleCheckbox
 }: TriggerActionsFormTypes) => {
-	const setHETrigger = useHETriggerStore((state) => state.setHETrigger);
 	const saveHETriggers = useHETriggerStore((state) => state.saveHETriggers);
 
 	const { buttonLabels } = useContext(AppContext);
@@ -241,61 +230,6 @@ const TriggerActionsForm = ({
 						{t('HETrigger:calibrate-all-button')}
 					</Button>
 				</div>
-				{Array.from({ length: Math.min(4,Math.floor(32/muxChannels)) }, (_, i) => (
-					<div
-						key={`he-trigger-item-${i}`} 
-						className="mt-3 mb-3"
-						hidden={values[`muxADCPin${i}` as keyof typeof values] === -1}
-					>
-						<div className="d-flex flex-shrink-0">
-							<label htmlFor={i}>
-								{muxChannels > 1 ? `${t('HETrigger:multiplexer-label')} ${i}` : 'Direct'} (ADC {values[`muxADCPin${i}` as keyof typeof values]})
-							</label>
-						</div>
-						{ (values[`muxADCPin${i}` as keyof typeof values] !== -1) ?
-						<div className={`action-grid-HE-trigger-${muxChannels} gap-3 mt-2 mb-3`}>
-							{Object.keys(triggers).splice(i*muxChannels,muxChannels).map((key, index) => (
-								<div
-									key={`select-he-${index}`}
-									className="d-flex align-items-center gap-2"
-								>
-									<div className="d-flex flex-shrink-0" style={{ width: '6rem' }}>
-										<label htmlFor={key}>{t('HETrigger:channel-label')} {index}</label>
-									</div>
-									<CustomSelect
-										key={`select-option-he-${index}`}
-										inputId={key}
-										isClearable
-										isSearchable
-										options={options}
-										value={getOption(triggers[key], triggers[key].action)}
-										getOptionLabel={optionLabel}
-										onChange={(change) =>
-											setHETrigger(
-												{
-													id: parseInt(key),
-													...triggers[key],
-													action: change?.value === undefined ? -10 : change.value,
-												}
-											)
-										}
-									/>
-									<Button type="button"
-										key={`select-button-he-${index}`}
-										onClick={(e) => {
-											setShowModal(true);
-											setCalibrationTarget(parseInt(key));
-											setCalibrateAllLoop(false);
-										}}
-										disabled={triggers[key].action === -10}
-										className="d-flex flex-shrink-0">
-										🧲
-									</Button>
-								</div>
-							))}
-						</div> : '' }
-					</div>
-				))}
 				<HECalibration
 					values={values}
 					showModal={showModal}
@@ -315,6 +249,11 @@ const TriggerActionsForm = ({
 					muxChannels={muxChannels}
 					usableChannels={Math.min(4, Math.floor(32 / muxChannels)) * muxChannels}
 					getOptionLabel={optionLabel}
+					onCalibrateChannel={(channel) => {
+						setCalibrationTarget(channel);
+						setCalibrateAllLoop(false);
+						setShowModal(true);
+					}}
 				></HEProfileSelector>
 			</div>
 			<div className="mt-2">

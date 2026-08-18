@@ -86,3 +86,33 @@
 	font-size: 0.8rem;
 	opacity: 0.7;
 }
+
+// Unified binding grid: one row per channel, carrying the action, and on the
+// base profile also the per-switch rapid trigger toggle and calibrate button.
+.he-binding-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+	gap: 0.5rem 1.5rem;
+}
+
+.he-binding-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.he-binding-label {
+	flex: 0 0 11rem;
+	font-size: 0.9rem;
+}
+
+.he-binding-select {
+	flex: 1 1 auto;
+	min-width: 9rem;
+}
+
+.he-binding-rt {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	font-size: 0.85rem;
+}

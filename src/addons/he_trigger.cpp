@@ -811,11 +811,10 @@ uint16_t HETriggerAddon::analogDeflection(uint8_t he, bool positive) {
 
 void HETriggerAddon::applyAction(Gamepad * gamepad, uint8_t he, int32_t action) {
     // Proportional analog output: drive the axis by how far the switch is
-    // pressed instead of slamming it to the rail.
-    HETriggerInfo & trigger =
-        Storage::getInstance().getAddonOptions().heTriggerOptions.triggers[he];
-    if (trigger.analogProportional) {
-        switch (action) {
+    // pressed instead of slamming it to the rail. Flagged by an offset on the
+    // action itself, so it is chosen per binding and therefore per profile.
+    if (action >= HE_ANALOG_PROPORTIONAL_OFFSET) {
+        switch (action - HE_ANALOG_PROPORTIONAL_OFFSET) {
             case GpioAction::ANALOG_DIRECTION_LS_X_NEG: gamepad->state.lx = analogDeflection(he, false); return;
             case GpioAction::ANALOG_DIRECTION_LS_X_POS: gamepad->state.lx = analogDeflection(he, true);  return;
             case GpioAction::ANALOG_DIRECTION_LS_Y_NEG: gamepad->state.ly = analogDeflection(he, false); return;

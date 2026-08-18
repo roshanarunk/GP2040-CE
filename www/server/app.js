@@ -625,8 +625,7 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			rtPressSensitivity: 10,
 			rtReleaseSensitivity: 10,
 			continuousRapidTrigger: false,
-			travelDeadzone: 3,
-			analogProportional: false
+			travelDeadzone: 3
 		},
 		{
 			action: 3, 
@@ -641,8 +640,7 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			rtPressSensitivity: 10,
 			rtReleaseSensitivity: 10,
 			continuousRapidTrigger: false,
-			travelDeadzone: 3,
-			analogProportional: false
+			travelDeadzone: 3
 		},
 		{
 			action: 4, 
@@ -657,8 +655,7 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			rtPressSensitivity: 10,
 			rtReleaseSensitivity: 10,
 			continuousRapidTrigger: false,
-			travelDeadzone: 3,
-			analogProportional: false
+			travelDeadzone: 3
 		},
 		{
 			action: 5, 
@@ -673,8 +670,7 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			rtPressSensitivity: 10,
 			rtReleaseSensitivity: 10,
 			continuousRapidTrigger: false,
-			travelDeadzone: 3,
-			analogProportional: false
+			travelDeadzone: 3
 		},
 	);
 	for(var i = 4; i < 32; i++) {
@@ -692,7 +688,6 @@ app.get('/api/getHETriggerCalibrations', (req, res) => {
 			rtReleaseSensitivity: 10,
 			continuousRapidTrigger: false,
 			travelDeadzone: 3,
-			analogProportional: false,
 		});
 	}
 	return res.send({triggers});

@@ -19,7 +19,6 @@ export type Trigger = {
 	rtReleaseSensitivity: number;
 	continuousRapidTrigger: boolean;
 	travelDeadzone: number;
-	analogProportional: boolean;
 };
 
 export const DEFAULT_TRIGGER: Trigger = {
@@ -36,7 +35,6 @@ export const DEFAULT_TRIGGER: Trigger = {
 	rtReleaseSensitivity: 10,
 	continuousRapidTrigger: false,
 	travelDeadzone: 3,
-	analogProportional: false,
 };
 
 type State = {

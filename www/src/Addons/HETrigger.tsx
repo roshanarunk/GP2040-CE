@@ -140,11 +140,24 @@ const buttonOptions = Object.entries(BUTTON_ACTIONS)
 	)
 	.map(([key, value]) => ({ label: key, value }));
 
+// Analog directions appear twice: once as the original full-tilt binding, and
+// once as a proportional variant. Making proportional a distinct choice rather
+// than a separate toggle means it is selectable per profile like any other
+// binding, and there is no hidden switch to discover.
 const analogOptions = Object.entries(BUTTON_ACTIONS)
 	.filter(
 		([, value]) => value >= ANALOG_ACTION_MIN && value <= ANALOG_ACTION_MAX,
 	)
 	.map(([key, value]) => ({ label: key, value }));
+
+// Offset applied to an analog action to mark it proportional. Must match
+// HE_ANALOG_PROPORTIONAL_OFFSET in headers/addons/he_trigger.h.
+export const HE_ANALOG_PROPORTIONAL_OFFSET = 2000;
+
+const analogProportionalOptions = analogOptions.map((option) => ({
+	label: option.label,
+	value: (option.value + HE_ANALOG_PROPORTIONAL_OFFSET) as PinActionValues,
+}));
 
 const profileOptions = HE_PROFILE_ACTIONS.map((value) => ({
 	label: heProfileActionLabel(value),
@@ -189,10 +202,22 @@ const TriggerActionsForm = ({
 	const groupedOptions = [
 		{ label: t('HETrigger:option-group-buttons'), options: buttonOptions },
 		{ label: t('HETrigger:option-group-analog'), options: analogOptions },
+		{
+			label: t('HETrigger:option-group-analog-proportional'),
+			options: analogProportionalOptions,
+		},
 		{ label: t('HETrigger:option-group-profiles'), options: profileOptions },
 	];
 
 	const optionLabel = (option: { label: string; value: number }) => {
+		if (
+			option.value >= ANALOG_ACTION_MIN + HE_ANALOG_PROPORTIONAL_OFFSET &&
+			option.value <= ANALOG_ACTION_MAX + HE_ANALOG_PROPORTIONAL_OFFSET
+		) {
+			return t('HETrigger:analog-proportional-option', {
+				action: t(`PinMapping:actions.${option.label}`),
+			});
+		}
 		if (HE_PROFILE_ACTIONS.includes(option.value)) {
 			return t(`HETrigger:action-${option.label.toLowerCase()}`);
 		}

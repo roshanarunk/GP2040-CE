@@ -909,6 +909,13 @@ static const HETriggerDefaults HE_TRIGGER_DEFAULTS[HETRIGGER_COUNT] = {
 // and are handled explicitly before the action switch. Deliberately NOT
 // GpioAction values: a positive GpioAction would show up in the GPIO pin
 // mapping UI and flow into GPIO init paths, and HE channels are not GPIOs.
+// Analog directions can be bound in two ways. The plain GpioAction snaps the
+// axis to full tilt on actuation; the same action plus this offset drives the
+// axis proportionally to how far the switch is pressed. Encoding it in the
+// action keeps it a per-binding choice, so it works per profile like anything
+// else, rather than needing a separate per-switch flag.
+#define HE_ANALOG_PROPORTIONAL_OFFSET 2000
+
 #define HE_ACTION_PROFILE_CYCLE 1000
 #define HE_ACTION_PROFILE_1     1001
 #define HE_ACTION_PROFILE_2     1002

@@ -1677,7 +1677,6 @@ std::string getHETriggerCalibrations()
         trigger["rtReleaseSensitivity"] = heTriggers[i].rtReleaseSensitivity;
         trigger["continuousRapidTrigger"] = heTriggers[i].continuousRapidTrigger;
         trigger["travelDeadzone"] = heTriggers[i].travelDeadzone;
-        trigger["analogProportional"] = heTriggers[i].analogProportional;
     }
 
     return serialize_json(doc);
@@ -1690,7 +1689,10 @@ std::string setHETriggerCalibrations()
     HETriggerInfo * heTriggers = Storage::getInstance().getAddonOptions().heTriggerOptions.triggers;
 
     for(int i = 0; i < 32; i++) {
-        heTriggers[i].action = doc["triggers"][i]["action"];
+        // `action` is deliberately NOT written here. Bindings are owned by
+        // setHETriggerProfiles, and both endpoints are posted from the same save
+        // button -- writing the binding from both raced, so whichever request
+        // landed second won and edits appeared not to save.
         heTriggers[i].idle = doc["triggers"][i]["idle"];
         heTriggers[i].active = doc["triggers"][i]["active"];
         heTriggers[i].pressed = doc["triggers"][i]["pressed"];
@@ -1712,8 +1714,6 @@ std::string setHETriggerCalibrations()
             doc["triggers"][i]["continuousRapidTrigger"] | heTriggers[i].continuousRapidTrigger;
         heTriggers[i].travelDeadzone =
             doc["triggers"][i]["travelDeadzone"] | heTriggers[i].travelDeadzone;
-        heTriggers[i].analogProportional =
-            doc["triggers"][i]["analogProportional"] | heTriggers[i].analogProportional;
     }
 
     Storage::getInstance().getAddonOptions().heTriggerOptions.triggers_count = 32;

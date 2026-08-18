@@ -132,14 +132,13 @@ export default {
 	'mux-group-label': 'Multiplexer {{index}} (ADC {{pin}})',
 	'direct-group-label': 'Direct (ADC {{pin}})',
 	'option-group-buttons': 'Buttons',
-	'option-group-analog': 'Analog Stick (proportional capable)',
+	'option-group-analog': 'Analog Stick (full tilt)',
+	'option-group-analog-proportional': 'Analog Stick (proportional to press depth)',
+	'analog-proportional-option': '{{action}} — proportional',
 	'option-group-profiles': 'HE Profile Switching',
 	'sensitivity-title': 'Sensitivity level (1 = lightest, 10 = deepest)',
 	'sensitivity-option': 'L{{level}} · {{percent}}%',
 	'sensitivity-custom': 'Custom',
-	'analog-switch-label': 'Analog',
-	'analog-switch-title':
-		'Drive the stick by how far the switch is pressed, instead of snapping to full tilt.',
 	'rapid-trigger-switch-label': 'RT',
 	'rapid-trigger-needs-calibration':
 		'Calibrate this switch before enabling rapid trigger.',

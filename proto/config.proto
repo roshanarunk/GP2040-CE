@@ -908,10 +908,10 @@ message HETriggerInfo
     optional bool   continuousRapidTrigger = 13;
     optional uint32 travelDeadzone         = 14;
 
-    // When the action is an ANALOG_DIRECTION_*, drive the axis proportionally to
-    // how far the switch is pressed rather than slamming it to full deflection.
-    // Ignored for ordinary button actions.
-    optional bool analogProportional = 15;
+    // Superseded by HE_ANALOG_PROPORTIONAL_OFFSET on the action itself, which
+    // makes proportional output a per-binding (and therefore per-profile) choice.
+    // Retained so the tag is not reused.
+    optional bool analogProportional = 15 [deprecated = true];
 }
 
 message HETriggerProfile

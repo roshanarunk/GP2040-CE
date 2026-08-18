@@ -15,6 +15,7 @@ import WebApi from '../Services/WebApi';
 import { BUTTON_ACTIONS } from '../Data/Pins';
 import { HE_PRESETS, DEFAULT_PRESET_LEVEL, getPreset } from '../Data/HEPresets';
 import useHETriggerStore from '../Store/useHETriggerStore';
+import useHEProfileStore from '../Store/useHEProfileStore';
 
 import './HECalibration.scss';
 
@@ -74,7 +75,8 @@ const actionLabel = (actionId: number) => {
 
 const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 	const { t } = useTranslation('');
-	const { triggers, fetchHETriggers, saveHETriggers } = useHETriggerStore();
+	const { triggers, fetchHETriggers } = useHETriggerStore();
+	const { saveHEProfiles } = useHEProfileStore();
 
 	const [step, setStep] = useState(STEP_READY);
 	const [status, setStatus] = useState<CalStatus | null>(null);
@@ -170,10 +172,11 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 
 			// Commit the action assignments too. The firmware decides which channels
 			// to sweep by reading the stored bindings, but assigning a button in the
-			// UI only updates the browser store until "Save Trigger Values" is
-			// pressed -- so without this, a newly assigned button is still unset as
-			// far as the sweep is concerned and gets skipped entirely.
-			await saveHETriggers();
+			// UI only updates the browser store until it is saved -- so without this,
+			// a newly assigned button is still unset as far as the sweep is concerned
+			// and gets skipped entirely. Bindings live in the profile store, which is
+			// what owns triggers[].action on the firmware side.
+			await saveHEProfiles();
 
 			const result = await WebApi.startHECalibration();
 			if (result?.error) {

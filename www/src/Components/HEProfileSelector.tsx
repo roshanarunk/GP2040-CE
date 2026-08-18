@@ -52,8 +52,11 @@ const HEProfileSelector = ({
 	const handleSave = async () => {
 		try {
 			// Bindings and per-channel tuning live in two different stores but are
-			// edited on one screen, so one button commits both.
-			await Promise.all([saveHEProfiles(), saveHETriggers()]);
+			// edited on one screen, so one button commits both. Sequential, not
+			// concurrent: both endpoints touch the same trigger records, and the
+			// firmware saves to flash on each one.
+			await saveHETriggers();
+			await saveHEProfiles();
 			setSaveMessage(t('Common:saved-success-message'));
 		} catch (error) {
 			setSaveMessage(t('Common:saved-error-message'));
@@ -111,20 +114,6 @@ const HEProfileSelector = ({
 		if (!trigger) return 0;
 		return matchPreset(trigger)?.level ?? 0;
 	};
-
-	const toggleAnalogProportional = (channel: number) => {
-		const trigger = triggers[channel] as Trigger;
-		if (!trigger) return;
-		setHETrigger({
-			id: channel,
-			...trigger,
-			analogProportional: !trigger.analogProportional,
-		});
-	};
-
-	// Only the analog stick directions can be driven proportionally; for an
-	// ordinary button action there is nothing to scale.
-	const isAnalogAction = (action: number) => action >= 59 && action <= 66;
 
 	// A channel with no measured travel has never been calibrated, and enabling
 	// rapid trigger on it would do nothing useful.
@@ -270,21 +259,6 @@ const HEProfileSelector = ({
 																		</option>
 																	))}
 																</Form.Select>
-																{isAnalogAction(profile.actions[channel]) && (
-																	<FormCheck
-																		type="switch"
-																		id={`he-analog-${channel}`}
-																		label={t('HETrigger:analog-switch-label')}
-																		checked={Boolean(
-																			triggers[channel]?.analogProportional,
-																		)}
-																		onChange={() =>
-																			toggleAnalogProportional(channel)
-																		}
-																		className="he-binding-rt"
-																		title={t('HETrigger:analog-switch-title')}
-																	/>
-																)}
 																<FormCheck
 																	type="switch"
 																	id={`he-rapid-${channel}`}

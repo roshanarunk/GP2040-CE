@@ -798,7 +798,16 @@ uint16_t HETriggerAddon::analogDeflection(uint8_t he, bool positive) {
     const int16_t travel = lastTravel[he];
     const int16_t actuation = actuationTravel[he];
 
-    int32_t range = TRAVEL_MAX - actuation;
+    // Full deflection is reached slightly before the bottom of travel. `pressed`
+    // was recorded as the hardest press seen during calibration, so demanding
+    // exactly that much again would mean the stick only truly maxes out when the
+    // user presses at least as hard as they did that once -- in practice a normal
+    // press lands around 85-95% and the diagonal corners stay unreachable. This
+    // mirrors the deadzone at the top of travel.
+    int32_t saturation = TRAVEL_MAX - deadzoneTravel[he];
+    if (saturation <= actuation) saturation = TRAVEL_MAX;
+
+    int32_t range = saturation - actuation;
     if (range <= 0) range = 1;
 
     int32_t scaled = ((int32_t)travel - actuation) * GAMEPAD_JOYSTICK_MID / range;

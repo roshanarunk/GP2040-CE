@@ -76,7 +76,7 @@ const actionLabel = (actionId: number) => {
 const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 	const { t } = useTranslation('');
 	const { triggers, fetchHETriggers } = useHETriggerStore();
-	const { saveHEProfiles } = useHEProfileStore();
+	const { profiles, saveHEProfiles } = useHEProfileStore();
 
 	const [step, setStep] = useState(STEP_READY);
 	const [status, setStatus] = useState<CalStatus | null>(null);
@@ -85,9 +85,35 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 	const [busy, setBusy] = useState(false);
 	const timerId = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
+	// A channel needs calibrating if it is bound in ANY profile, not just the base
+	// one: a profile for a game that uses fewer buttons would otherwise leave the
+	// rest uncalibrated even though other profiles rely on them. This mirrors
+	// HETriggerAddon::isChannelAssigned, which is what the firmware actually
+	// sweeps -- the two must agree or the wizard shows fewer tiles than it captures.
+	const isAssignedAnywhere = (index: number) => {
+		if (triggers[index]?.action !== -10) return true;
+		return profiles.some(
+			(profile, profileIndex) =>
+				profileIndex > 0 &&
+				profile.actions?.[index] !== undefined &&
+				profile.actions[index] !== -10,
+		);
+	};
+
+	// Label a channel by whichever profile actually binds it.
+	const effectiveAction = (index: number) => {
+		if (triggers[index]?.action !== -10)
+			return triggers[index].action as number;
+		for (let p = 1; p < profiles.length; p++) {
+			const action = profiles[p]?.actions?.[index];
+			if (action !== undefined && action !== -10) return action;
+		}
+		return -10;
+	};
+
 	const assignedChannels = triggers
 		.map((trigger, index) => ({ trigger, index }))
-		.filter(({ trigger }) => trigger.action !== -10);
+		.filter(({ index }) => isAssignedAnywhere(index));
 
 	// Where a channel physically lives, for the tile subtitle.
 	const channelLocation = (index: number) => {
@@ -263,10 +289,10 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 							})}
 						</p>
 						<div className="he-channel-grid">
-							{assignedChannels.map(({ trigger, index }) => (
+							{assignedChannels.map(({ index }) => (
 								<div key={`ready-${index}`} className="he-channel-tile">
 									<div className="he-channel-name">
-										{actionLabel(trigger.action as number)}
+										{actionLabel(effectiveAction(index))}
 									</div>
 									<div className="he-channel-meta">
 										{channelLocation(index)}
@@ -286,12 +312,12 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 							label={`${baselineProgress}%`}
 						/>
 						<div className="he-channel-grid mt-3">
-							{assignedChannels.map(({ trigger, index }) => {
+							{assignedChannels.map(({ index }) => {
 								const channel = channelById(index);
 								return (
 									<div key={`base-${index}`} className="he-channel-tile">
 										<div className="he-channel-name">
-											{actionLabel(trigger.action as number)}
+											{actionLabel(effectiveAction(index))}
 										</div>
 										<div className="he-channel-value">
 											{channel?.raw ?? '—'}
@@ -321,7 +347,7 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 							})}
 						</div>
 						<div className="he-channel-grid mt-2">
-							{assignedChannels.map(({ trigger, index }) => {
+							{assignedChannels.map(({ index }) => {
 								const channel = channelById(index);
 								const deviation = Math.abs(channel?.maxDeviation ?? 0);
 								const captured = channel?.moved ?? false;
@@ -331,7 +357,7 @@ const HECalibrationWizard = ({ showModal, setShowModal, values }: Props) => {
 										className={`he-channel-tile ${captured ? 'captured' : ''}`}
 									>
 										<div className="he-channel-name">
-											{actionLabel(trigger.action as number)}
+											{actionLabel(effectiveAction(index))}
 										</div>
 										<ProgressBar
 											now={Math.min(100, (deviation / 2000) * 100)}

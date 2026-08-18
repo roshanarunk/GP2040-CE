@@ -13,6 +13,7 @@ import HEProfileSelector from '../Components/HEProfileSelector';
 import HEMonitor from '../Components/HEMonitor';
 
 import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
+import useHEProfileStore from '../Store/useHEProfileStore';
 
 import { AppContext } from '../Contexts/AppContext';
 import Section from '../Components/Section';
@@ -182,6 +183,7 @@ const TriggerActionsForm = ({
 	handleCheckbox,
 }: TriggerActionsFormTypes) => {
 	const saveHETriggers = useHETriggerStore((state) => state.saveHETriggers);
+	const heProfiles = useHEProfileStore((state) => state.profiles);
 
 	const { buttonLabels } = useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
@@ -208,6 +210,15 @@ const TriggerActionsForm = ({
 		},
 		{ label: t('HETrigger:option-group-profiles'), options: profileOptions },
 	];
+
+	// Calibration covers any channel bound in any profile, matching the firmware,
+	// so the buttons must not be gated on the base profile alone.
+	const anyChannelAssigned =
+		triggers.some((trigger) => trigger.action !== -10) ||
+		heProfiles.some(
+			(profile, index) =>
+				index > 0 && profile.actions?.some((action) => action !== -10),
+		);
 
 	const optionLabel = (option: { label: string; value: number }) => {
 		if (
@@ -252,11 +263,7 @@ const TriggerActionsForm = ({
 						type="button"
 						key={`calibrate-wizard-he`}
 						onClick={() => setShowWizard(true)}
-						disabled={
-							triggers.filter((e) => {
-								return e.action !== -10;
-							}).length === 0
-						}
+						disabled={!anyChannelAssigned}
 						className="my-2"
 					>
 						{t('HETrigger:wizard-button')}
@@ -271,11 +278,7 @@ const TriggerActionsForm = ({
 							setCalibrationTarget(0);
 							setCalibrateAllLoop(true);
 						}}
-						disabled={
-							triggers.filter((e) => {
-								return e.action !== -10;
-							}).length === 0
-						}
+						disabled={!anyChannelAssigned}
 						className="my-2"
 					>
 						{t('HETrigger:calibrate-all-button')}

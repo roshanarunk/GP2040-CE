@@ -916,10 +916,26 @@ message HETriggerInfo
 
 message HETriggerProfile
 {
-    // Bindings ONLY. Calibration and tuning live in HETriggerInfo and are
-    // shared across every profile.
+    // Bindings, plus the tuning that is a behavioural choice rather than a
+    // property of the switch. Calibration (idle/pressed/polarity/noise) stays in
+    // HETriggerInfo and is shared, since it describes the hardware.
+    //
+    // A profile with no stored tuning falls back to the base switch values, the
+    // same rule bindings use, so existing configs keep working unmigrated. An
+    // entry of -1 means "not set for this profile".
     repeated int32 actions = 1 [(nanopb).max_count = 32];
     optional bool enabled = 2;
+
+    // Per-channel tuning overrides. Stored as uint32 rather than int32 because a
+    // negative varint costs 10 bytes on the wire and this is 32 entries x 3
+    // profiles x 3 fields -- signed would add ~4.2KB instead of ~1.9KB. 0 means
+    // "not set for this profile, use the base switch value"; a real actuation
+    // point or sensitivity is always >= 1, and rapidTrigger stores 1/2 for
+    // off/on so that 0 stays free as the not-set sentinel.
+    repeated uint32 rapidTrigger = 3 [(nanopb).max_count = 32];
+    repeated uint32 actuationPoint = 4 [(nanopb).max_count = 32];
+    repeated uint32 rtPressSensitivity = 5 [(nanopb).max_count = 32];
+    repeated uint32 rtReleaseSensitivity = 6 [(nanopb).max_count = 32];
 }
 
 message HETriggerOptions

@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next';
 import CustomSelect from './CustomSelect';
 import useHEProfileStore, {
 	HE_PROFILE_COUNT,
+	RT_UNSET,
+	RT_OFF,
+	RT_ON,
 } from '../Store/useHEProfileStore';
 import useHETriggerStore, { Trigger } from '../Store/useHETriggerStore';
 import { HE_PRESETS, getPreset, matchPreset } from '../Data/HEPresets';
@@ -40,6 +43,7 @@ const HEProfileSelector = ({
 		fetchHEProfiles,
 		setProfileAction,
 		toggleProfileEnabled,
+		setProfileTuning,
 		saveHEProfiles,
 	} = useHEProfileStore();
 	const { triggers, setHETrigger, saveHETriggers } = useHETriggerStore();
@@ -115,6 +119,48 @@ const HEProfileSelector = ({
 		return matchPreset(trigger)?.level ?? 0;
 	};
 
+	// On a non-base profile a channel may either inherit the base switch tuning
+	// (stored as 0) or override it. Level 0 in the dropdown means inherit.
+	const profileSensitivityLevel = (profileIndex: number, channel: number) => {
+		const profile = profiles[profileIndex];
+		if (!profile) return RT_UNSET;
+		const actuation = profile.actuationPoint?.[channel] ?? 0;
+		if (actuation === 0) return RT_UNSET;
+		return (
+			matchPreset({
+				actuationPoint: actuation,
+				rtPressSensitivity: profile.rtPressSensitivity?.[channel] ?? 0,
+				rtReleaseSensitivity: profile.rtReleaseSensitivity?.[channel] ?? 0,
+				// Continuous RT is not overridable per profile, so match against the
+				// level's own value to avoid reporting Custom for every level.
+				continuousRapidTrigger: getPreset(
+					HE_PRESETS.find((p) => p.actuationPoint === actuation)?.level ?? 0,
+				).continuousRapidTrigger,
+			})?.level ?? -1
+		);
+	};
+
+	const setProfileSensitivity = (
+		profileIndex: number,
+		channel: number,
+		level: number,
+	) => {
+		if (level === RT_UNSET) {
+			setProfileTuning(profileIndex, channel, {
+				actuationPoint: 0,
+				rtPressSensitivity: 0,
+				rtReleaseSensitivity: 0,
+			});
+			return;
+		}
+		const preset = getPreset(level);
+		setProfileTuning(profileIndex, channel, {
+			actuationPoint: preset.actuationPoint,
+			rtPressSensitivity: preset.rtPressSensitivity,
+			rtReleaseSensitivity: preset.rtReleaseSensitivity,
+		});
+	};
+
 	// A channel with no measured travel has never been calibrated, and enabling
 	// rapid trigger on it would do nothing useful.
 	const isCalibrated = (channel: number) => {
@@ -174,6 +220,61 @@ const HEProfileSelector = ({
 							{profileIndex === 0 && (
 								<div className="text-muted mb-3">
 									{t('HETrigger:profile-base-note')}
+								</div>
+							)}
+							{profileIndex > 0 && (
+								<div className="he-binding-controls">
+									{/* Tuning can be overridden per profile, or left to inherit the
+									    base switch values. */}
+									<Form.Select
+										size="sm"
+										className="he-binding-sens"
+										value={profileSensitivityLevel(profileIndex, channel)}
+										disabled={!isCalibrated(channel)}
+										onChange={(e) =>
+											setProfileSensitivity(
+												profileIndex,
+												channel,
+												Number(e.target.value),
+											)
+										}
+										title={t('HETrigger:sensitivity-title')}
+									>
+										<option value={RT_UNSET}>
+											{t('HETrigger:tuning-inherit')}
+										</option>
+										{HE_PRESETS.map((preset) => (
+											<option
+												key={`psens-${preset.level}`}
+												value={preset.level}
+											>
+												{t('HETrigger:sensitivity-option', {
+													level: preset.level,
+													percent: preset.actuationPoint,
+												})}
+											</option>
+										))}
+									</Form.Select>
+									<Form.Select
+										size="sm"
+										className="he-binding-sens"
+										value={
+											profiles[profileIndex]?.rapidTrigger?.[channel] ??
+											RT_UNSET
+										}
+										disabled={!isCalibrated(channel)}
+										onChange={(e) =>
+											setProfileTuning(profileIndex, channel, {
+												rapidTrigger: Number(e.target.value),
+											})
+										}
+									>
+										<option value={RT_UNSET}>
+											{t('HETrigger:rt-inherit')}
+										</option>
+										<option value={RT_OFF}>{t('HETrigger:rt-off')}</option>
+										<option value={RT_ON}>{t('HETrigger:rt-on')}</option>
+									</Form.Select>
 								</div>
 							)}
 

@@ -153,9 +153,11 @@ void HETriggerAddon::rebuildGeometry() {
         // normalize to the same 0..TRAVEL_MAX range without a runtime branch.
         travelSpanRecip[he] = ((int32_t)TRAVEL_MAX << 16) / span;
 
-        actuationTravel[he]   = (int16_t)((int32_t)trigger.actuationPoint       * TRAVEL_MAX / 100);
-        pressSensTravel[he]   = (int16_t)((int32_t)trigger.rtPressSensitivity   * TRAVEL_MAX / 100);
-        releaseSensTravel[he] = (int16_t)((int32_t)trigger.rtReleaseSensitivity * TRAVEL_MAX / 100);
+        // Resolved through the active profile, which may override any of these.
+        actuationTravel[he]   = (int16_t)((int32_t)tuningFor(he, HETuningField::ACTUATION_POINT) * TRAVEL_MAX / 100);
+        pressSensTravel[he]   = (int16_t)((int32_t)tuningFor(he, HETuningField::RT_PRESS)        * TRAVEL_MAX / 100);
+        releaseSensTravel[he] = (int16_t)((int32_t)tuningFor(he, HETuningField::RT_RELEASE)      * TRAVEL_MAX / 100);
+        rapidTriggerOn[he]    = (tuningFor(he, HETuningField::RAPID_TRIGGER) != 0);
         deadzoneTravel[he]    = (int16_t)((int32_t)trigger.travelDeadzone       * TRAVEL_MAX / 100);
 
         // `noise` is stored in raw ADC counts; convert it into travel units so it
@@ -228,10 +230,58 @@ int32_t HETriggerAddon::actionFor(uint8_t he) {
     return options.profileSets[index].actions[he];
 }
 
+// Per-channel tuning can be overridden per profile. 0 means "not set for this
+// profile", so the base switch value is used -- the same fallback rule bindings
+// follow, which is what keeps configs written before these fields existed working
+// without a migration.
+uint32_t HETriggerAddon::tuningFor(uint8_t he, HETuningField field) {
+    HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
+    HETriggerInfo & base = options.triggers[he];
+
+    if (activeProfile != 0) {
+        const uint8_t index = activeProfile - 1;
+        if (index < options.profileSets_count) {
+            HETriggerProfile & profile = options.profileSets[index];
+            uint32_t stored = 0;
+            switch (field) {
+                case HETuningField::RAPID_TRIGGER:
+                    if (he < profile.rapidTrigger_count) stored = profile.rapidTrigger[he];
+                    // Stored as 1 = off, 2 = on, so that 0 remains "not set".
+                    if (stored != 0) return (stored == 2) ? 1 : 0;
+                    break;
+                case HETuningField::ACTUATION_POINT:
+                    if (he < profile.actuationPoint_count) stored = profile.actuationPoint[he];
+                    if (stored != 0) return stored;
+                    break;
+                case HETuningField::RT_PRESS:
+                    if (he < profile.rtPressSensitivity_count) stored = profile.rtPressSensitivity[he];
+                    if (stored != 0) return stored;
+                    break;
+                case HETuningField::RT_RELEASE:
+                    if (he < profile.rtReleaseSensitivity_count) stored = profile.rtReleaseSensitivity[he];
+                    if (stored != 0) return stored;
+                    break;
+            }
+        }
+    }
+
+    switch (field) {
+        case HETuningField::RAPID_TRIGGER:  return base.rapidTrigger ? 1 : 0;
+        case HETuningField::ACTUATION_POINT: return base.actuationPoint;
+        case HETuningField::RT_PRESS:        return base.rtPressSensitivity;
+        case HETuningField::RT_RELEASE:      return base.rtReleaseSensitivity;
+    }
+    return 0;
+}
+
 void HETriggerAddon::setHEProfile(uint8_t profile) {
     if (profile >= HE_PROFILE_COUNT || profile == activeProfile) return;
 
     activeProfile = profile;
+
+    // Tuning can differ per profile, and rebuildGeometry caches the resolved
+    // values, so the cache is stale the moment the profile changes.
+    rebuildGeometry();
 
     // Drop all press state. Bindings just changed underneath every channel, so a
     // button held across the switch would otherwise leave the *previous*
@@ -302,7 +352,7 @@ void HETriggerAddon::updateTrigger(uint8_t he, int16_t travel) {
         return;
     }
 
-    if (!trigger.rapidTrigger) {
+    if (!rapidTriggerOn[he]) {
         // Plain actuation with a hysteresis band, so a switch resting exactly on
         // the actuation point does not chatter.
         const int16_t hysteresis = noiseTravel[he];

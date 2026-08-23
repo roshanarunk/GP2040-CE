@@ -945,6 +945,14 @@ static const HETriggerDefaults HE_TRIGGER_DEFAULTS[HETRIGGER_COUNT] = {
 // would otherwise be left with a dead controller.
 #define HETRIGGER_CAL_TIMEOUT_MS 300000
 
+// Tuning that a profile may override per channel.
+enum class HETuningField : uint8_t {
+    RAPID_TRIGGER = 0,
+    ACTUATION_POINT = 1,
+    RT_PRESS = 2,
+    RT_RELEASE = 3,
+};
+
 enum class HECalMode : uint8_t {
     OFF = 0,
     IDLE_BASELINE = 1,
@@ -1040,6 +1048,9 @@ private:
     void updateTrigger(uint8_t he, int16_t travel);
     // Resolves the binding for a channel under the active profile.
     int32_t actionFor(uint8_t he);
+    // Resolves one tuning value through the active profile, falling back to the
+    // base switch when the profile does not override it.
+    uint32_t tuningFor(uint8_t he, HETuningField field);
     void applyAction(Gamepad* gamepad, uint8_t he, int32_t action);
     uint16_t analogDeflection(uint8_t he, bool positive);
     // Commits a pending profile change once cycling has settled.
@@ -1075,6 +1086,9 @@ private:
     int16_t  releaseSensTravel[HETRIGGER_COUNT] = {};
     int16_t  deadzoneTravel[HETRIGGER_COUNT] = {};
     int16_t  noiseTravel[HETRIGGER_COUNT] = {};
+    // Resolved rapid trigger state per channel; cached because it can come from
+    // the active profile rather than the switch record.
+    bool     rapidTriggerOn[HETRIGGER_COUNT] = {};
 
     float emaSmoothingFactor = 0.0f;
 

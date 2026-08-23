@@ -12,7 +12,18 @@ export const HE_TRIGGER_COUNT = 32;
 export type HEProfile = {
 	enabled: boolean;
 	actions: number[];
+	// Per-channel tuning overrides. 0 means "not set for this profile", so the
+	// base switch value is used. rapidTrigger stores 1 = off, 2 = on, leaving 0
+	// free as the not-set sentinel.
+	rapidTrigger: number[];
+	actuationPoint: number[];
+	rtPressSensitivity: number[];
+	rtReleaseSensitivity: number[];
 };
+
+export const RT_UNSET = 0;
+export const RT_OFF = 1;
+export const RT_ON = 2;
 
 type State = {
 	profiles: HEProfile[];
@@ -22,15 +33,38 @@ type State = {
 
 type Actions = {
 	fetchHEProfiles: () => Promise<void>;
-	setProfileAction: (profileIndex: number, channel: number, action: number) => void;
+	setProfileAction: (
+		profileIndex: number,
+		channel: number,
+		action: number,
+	) => void;
 	toggleProfileEnabled: (profileIndex: number) => void;
+	setProfileTuning: (
+		profileIndex: number,
+		channel: number,
+		patch: Partial<
+			Record<
+				| 'rapidTrigger'
+				| 'actuationPoint'
+				| 'rtPressSensitivity'
+				| 'rtReleaseSensitivity',
+				number
+			>
+		>,
+	) => void;
 	setActiveProfile: (profileIndex: number) => void;
 	saveHEProfiles: () => Promise<object>;
 };
 
+const zeros = () => Array.from({ length: HE_TRIGGER_COUNT }, () => 0);
+
 const emptyProfile = (): HEProfile => ({
 	enabled: false,
 	actions: Array.from({ length: HE_TRIGGER_COUNT }, () => -10),
+	rapidTrigger: zeros(),
+	actuationPoint: zeros(),
+	rtPressSensitivity: zeros(),
+	rtReleaseSensitivity: zeros(),
 });
 
 const INITIAL_STATE: State = {
@@ -55,12 +89,22 @@ const useHEProfileStore = create<State & Actions>()((set, get) => ({
 			profiles: Array.from({ length: HE_PROFILE_COUNT }, (_, index) => {
 				const incoming = data?.profiles?.[index];
 				if (!incoming) return { ...emptyProfile(), enabled: index === 0 };
+				const column = (key: keyof HEProfile) =>
+					Array.from(
+						{ length: HE_TRIGGER_COUNT },
+						(__, channel) =>
+							(incoming[key] as number[] | undefined)?.[channel] ?? 0,
+					);
 				return {
 					enabled: index === 0 ? true : Boolean(incoming.enabled),
 					actions: Array.from(
 						{ length: HE_TRIGGER_COUNT },
 						(__, channel) => incoming.actions?.[channel] ?? -10,
 					),
+					rapidTrigger: column('rapidTrigger'),
+					actuationPoint: column('actuationPoint'),
+					rtPressSensitivity: column('rtPressSensitivity'),
+					rtReleaseSensitivity: column('rtReleaseSensitivity'),
 				};
 			}),
 			activeProfile: data?.activeProfile ?? 0,
@@ -84,6 +128,22 @@ const useHEProfileStore = create<State & Actions>()((set, get) => ({
 		});
 	},
 
+	setProfileTuning: (profileIndex, channel, patch) => {
+		set((state) => ({
+			...state,
+			profiles: state.profiles.map((profile, index) => {
+				if (index !== profileIndex) return profile;
+				const next = { ...profile };
+				for (const [key, value] of Object.entries(patch)) {
+					const column = [...(next[key as keyof HEProfile] as number[])];
+					column[channel] = value as number;
+					(next as Record<string, unknown>)[key] = column;
+				}
+				return next;
+			}),
+		}));
+	},
+
 	toggleProfileEnabled: (profileIndex) => {
 		// The base profile is the fallback for every other profile, so it must
 		// always remain enabled.
@@ -98,7 +158,8 @@ const useHEProfileStore = create<State & Actions>()((set, get) => ({
 		}));
 	},
 
-	setActiveProfile: (profileIndex) => set((state) => ({ ...state, activeProfile: profileIndex })),
+	setActiveProfile: (profileIndex) =>
+		set((state) => ({ ...state, activeProfile: profileIndex })),
 
 	saveHEProfiles: async () => {
 		const { profiles, activeProfile } = get();

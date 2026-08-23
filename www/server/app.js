@@ -1024,6 +1024,11 @@ let heProfiles = {
 		actions: Array.from({ length: 32 }, (__, channel) =>
 			channel < 8 ? channel + 1 : -10,
 		),
+		// 0 = inherit the base switch value.
+		rapidTrigger: Array.from({ length: 32 }, () => 0),
+		actuationPoint: Array.from({ length: 32 }, () => 0),
+		rtPressSensitivity: Array.from({ length: 32 }, () => 0),
+		rtReleaseSensitivity: Array.from({ length: 32 }, () => 0),
 	})),
 };
 

@@ -114,15 +114,16 @@ export default {
 	// Binding profiles
 	'profiles-header': 'Hall-Effect Binding Profiles',
 	'profiles-shared-tuning-note':
-		'Profiles change which action each button sends. Calibration, actuation points and ' +
-		'rapid trigger settings are per switch and shared across all profiles. A button left ' +
+		'Profiles change which action each button sends, and can optionally override its ' +
+		'sensitivity and rapid trigger. Anything left on Inherit uses the base profile value. ' +
+		'Calibration itself is a property of the switch and is always shared. A button left ' +
 		'unassigned in a profile sends nothing while that profile is active.',
 	'profile-base-label': 'Base',
 	'profile-label': 'Profile {{number}}',
 	'profile-enabled-label': 'Enabled (included when cycling profiles)',
 	'profile-base-note':
-		'The base profile is always enabled. Rapid trigger and calibration are per switch, ' +
-		'so they are set here and apply to every profile.',
+		'The base profile is always enabled. Values set here apply to every profile unless a ' +
+		'profile overrides them. Calibration is always shared.',
 	'profile-unbound-note':
 		'Leaving a button unassigned in this profile means it sends nothing while the profile ' +
 		'is active.',
@@ -139,6 +140,10 @@ export default {
 	'sensitivity-title': 'Sensitivity level (1 = lightest, 10 = deepest)',
 	'sensitivity-option': 'L{{level}} · {{percent}}%',
 	'sensitivity-custom': 'Custom',
+	'tuning-inherit': 'Inherit',
+	'rt-inherit': 'RT: inherit',
+	'rt-off': 'RT: off',
+	'rt-on': 'RT: on',
 	'rapid-trigger-switch-label': 'RT',
 	'rapid-trigger-needs-calibration':
 		'Calibrate this switch before enabling rapid trigger.',

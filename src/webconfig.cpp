@@ -1905,8 +1905,9 @@ std::string getHETriggerProfiles()
     // rather than an error.
     const size_t capacity = JSON_OBJECT_SIZE(4) +
                             JSON_ARRAY_SIZE(HE_PROFILE_COUNT) +
-                            HE_PROFILE_COUNT * (JSON_OBJECT_SIZE(4) + JSON_ARRAY_SIZE(HETRIGGER_COUNT)) +
-                            256;
+                            HE_PROFILE_COUNT * (JSON_OBJECT_SIZE(8) +
+                                                5 * JSON_ARRAY_SIZE(HETRIGGER_COUNT)) +
+                            512;
     DynamicJsonDocument doc(capacity);
 
     HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
@@ -1924,13 +1925,24 @@ std::string getHETriggerProfiles()
     }
 
     for (uint16_t p = 0; p < options.profileSets_count; p++) {
+        HETriggerProfile & set = options.profileSets[p];
         JsonObject profile = profileList.createNestedObject();
-        profile["enabled"] = options.profileSets[p].enabled;
+        profile["enabled"] = set.enabled;
         JsonArray actions = profile.createNestedArray("actions");
         for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
-            actions.add(i < options.profileSets[p].actions_count
-                            ? options.profileSets[p].actions[i]
-                            : (int32_t)GpioAction::NONE);
+            actions.add(i < set.actions_count ? set.actions[i]
+                                              : (int32_t)GpioAction::NONE);
+        }
+        // Per-profile tuning overrides; 0 means "not set, use the base switch".
+        JsonArray rt = profile.createNestedArray("rapidTrigger");
+        JsonArray ap = profile.createNestedArray("actuationPoint");
+        JsonArray rp = profile.createNestedArray("rtPressSensitivity");
+        JsonArray rr = profile.createNestedArray("rtReleaseSensitivity");
+        for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+            rt.add(i < set.rapidTrigger_count ? set.rapidTrigger[i] : 0);
+            ap.add(i < set.actuationPoint_count ? set.actuationPoint[i] : 0);
+            rp.add(i < set.rtPressSensitivity_count ? set.rtPressSensitivity[i] : 0);
+            rr.add(i < set.rtReleaseSensitivity_count ? set.rtReleaseSensitivity[i] : 0);
         }
     }
 
@@ -1958,9 +1970,17 @@ std::string setHETriggerProfiles()
 
         for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
             options.profileSets[p].actions[i] = profile["actions"][i];
+            options.profileSets[p].rapidTrigger[i] = profile["rapidTrigger"][i] | 0;
+            options.profileSets[p].actuationPoint[i] = profile["actuationPoint"][i] | 0;
+            options.profileSets[p].rtPressSensitivity[i] = profile["rtPressSensitivity"][i] | 0;
+            options.profileSets[p].rtReleaseSensitivity[i] = profile["rtReleaseSensitivity"][i] | 0;
         }
         // reminder that this must be set or else nanopb won't retain anything
         options.profileSets[p].actions_count = HETRIGGER_COUNT;
+        options.profileSets[p].rapidTrigger_count = HETRIGGER_COUNT;
+        options.profileSets[p].actuationPoint_count = HETRIGGER_COUNT;
+        options.profileSets[p].rtPressSensitivity_count = HETRIGGER_COUNT;
+        options.profileSets[p].rtReleaseSensitivity_count = HETRIGGER_COUNT;
         options.profileSets[p].enabled = profile["enabled"] | false;
         options.profileSets[p].has_enabled = true;
     }

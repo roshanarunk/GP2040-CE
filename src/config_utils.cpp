@@ -866,6 +866,21 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
             }
             profile.actions_count = HETRIGGER_COUNT;
         }
+        // Tuning overrides start unset (0), meaning the profile inherits the base
+        // switch values. That is what keeps configs written before these fields
+        // existed behaving exactly as they did.
+        if (profile.rapidTrigger_count == 0) {
+            for (uint16_t i = 0; i < HETRIGGER_COUNT; i++) {
+                profile.rapidTrigger[i] = 0;
+                profile.actuationPoint[i] = 0;
+                profile.rtPressSensitivity[i] = 0;
+                profile.rtReleaseSensitivity[i] = 0;
+            }
+        }
+        profile.rapidTrigger_count = HETRIGGER_COUNT;
+        profile.actuationPoint_count = HETRIGGER_COUNT;
+        profile.rtPressSensitivity_count = HETRIGGER_COUNT;
+        profile.rtReleaseSensitivity_count = HETRIGGER_COUNT;
         INIT_UNSET_PROPERTY(profile, enabled, false);
     }
     INIT_UNSET_PROPERTY(config.addonOptions.heTriggerOptions, activeProfile, 0);

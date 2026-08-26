@@ -222,61 +222,6 @@ const HEProfileSelector = ({
 									{t('HETrigger:profile-base-note')}
 								</div>
 							)}
-							{profileIndex > 0 && (
-								<div className="he-binding-controls">
-									{/* Tuning can be overridden per profile, or left to inherit the
-									    base switch values. */}
-									<Form.Select
-										size="sm"
-										className="he-binding-sens"
-										value={profileSensitivityLevel(profileIndex, channel)}
-										disabled={!isCalibrated(channel)}
-										onChange={(e) =>
-											setProfileSensitivity(
-												profileIndex,
-												channel,
-												Number(e.target.value),
-											)
-										}
-										title={t('HETrigger:sensitivity-title')}
-									>
-										<option value={RT_UNSET}>
-											{t('HETrigger:tuning-inherit')}
-										</option>
-										{HE_PRESETS.map((preset) => (
-											<option
-												key={`psens-${preset.level}`}
-												value={preset.level}
-											>
-												{t('HETrigger:sensitivity-option', {
-													level: preset.level,
-													percent: preset.actuationPoint,
-												})}
-											</option>
-										))}
-									</Form.Select>
-									<Form.Select
-										size="sm"
-										className="he-binding-sens"
-										value={
-											profiles[profileIndex]?.rapidTrigger?.[channel] ??
-											RT_UNSET
-										}
-										disabled={!isCalibrated(channel)}
-										onChange={(e) =>
-											setProfileTuning(profileIndex, channel, {
-												rapidTrigger: Number(e.target.value),
-											})
-										}
-									>
-										<option value={RT_UNSET}>
-											{t('HETrigger:rt-inherit')}
-										</option>
-										<option value={RT_OFF}>{t('HETrigger:rt-off')}</option>
-										<option value={RT_ON}>{t('HETrigger:rt-on')}</option>
-									</Form.Select>
-								</div>
-							)}
 
 							{connectedMuxes.map((adcPin, muxIndex) =>
 								adcPin === -1 ? null : (
@@ -390,6 +335,69 @@ const HEProfileSelector = ({
 																>
 																	🧲
 																</Button>
+															</div>
+														)}
+														{/* Other profiles can override the same tuning, or inherit whatever
+														    the base profile has for this switch. */}
+														{profileIndex > 0 && (
+															<div className="he-binding-controls">
+																<Form.Select
+																	size="sm"
+																	className="he-binding-sens"
+																	value={profileSensitivityLevel(
+																		profileIndex,
+																		channel,
+																	)}
+																	disabled={!isCalibrated(channel)}
+																	onChange={(e) =>
+																		setProfileSensitivity(
+																			profileIndex,
+																			channel,
+																			Number(e.target.value),
+																		)
+																	}
+																	title={t('HETrigger:sensitivity-title')}
+																>
+																	<option value={RT_UNSET}>
+																		{t('HETrigger:tuning-inherit')}
+																	</option>
+																	{HE_PRESETS.map((preset) => (
+																		<option
+																			key={`psens-${preset.level}`}
+																			value={preset.level}
+																		>
+																			{t('HETrigger:sensitivity-option', {
+																				level: preset.level,
+																				percent: preset.actuationPoint,
+																			})}
+																		</option>
+																	))}
+																</Form.Select>
+																<Form.Select
+																	size="sm"
+																	className="he-binding-sens"
+																	value={
+																		profiles[profileIndex]?.rapidTrigger?.[
+																			channel
+																		] ?? RT_UNSET
+																	}
+																	disabled={!isCalibrated(channel)}
+																	onChange={(e) =>
+																		setProfileTuning(profileIndex, channel, {
+																			rapidTrigger: Number(e.target.value),
+																		})
+																	}
+																>
+																	<option value={RT_UNSET}>
+																		{t('HETrigger:rt-inherit')}
+																	</option>
+																	<option value={RT_OFF}>
+																		{t('HETrigger:rt-off')}
+																	</option>
+																	<option value={RT_ON}>
+																		{t('HETrigger:rt-on')}
+																	</option>
+																</Form.Select>
 															</div>
 														)}
 													</div>
